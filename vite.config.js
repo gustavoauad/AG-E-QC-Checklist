@@ -3,5 +3,9 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  base: '/AG-E-QC-Checklist/',
+  base: '/AGE-QC-Checklist/',
+  build: {
+    outDir: 'docs',
+    emptyOutDir: true,
+  },
 })
