@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../supabase";
+import AgeLogo from "./AgeLogo";
 
 const inputStyle = {
   width: "100%",
@@ -54,12 +55,10 @@ export default function AuthScreen() {
         
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "32px" }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: "2px", marginBottom: "10px" }}>
-            <span style={{ fontSize: "32px", fontWeight: "800", color: "#f1f5f9", letterSpacing: "-1px" }}>AG</span>
-            <span style={{ fontSize: "32px", fontWeight: "800", color: "#0095da", letterSpacing: "-1px" }}>/</span>
-            <span style={{ fontSize: "32px", fontWeight: "800", color: "#f1f5f9", letterSpacing: "-1px" }}>E</span>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "12px" }}>
+            <AgeLogo height={40} />
           </div>
-          <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: "600" }}>QC Checklist</p>
+          <p style={{ color: "#777f8f", fontSize: "12px", margin: 0, letterSpacing: "0.1em", textTransform: "uppercase", fontWeight: "600" }}>QC Checklist</p>
         </div>
 
         {/* Tabs */}

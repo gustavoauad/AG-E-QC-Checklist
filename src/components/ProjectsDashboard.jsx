@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 import { useIsMobile } from "../useIsMobile";
+import AgeLogo from "./AgeLogo";
 import CreateProjectModal from "./CreateProjectModal";
 import ProjectSetupModal from "./ProjectSetupModal";
 
@@ -57,11 +58,9 @@ export default function ProjectsDashboard({ session, onSelectProject, onSignOut,
         padding: isMobile ? "12px 16px" : "16px 24px",
         display: "flex", justifyContent: "space-between", alignItems: "center",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
-          <span style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: "800", color: "#f1f5f9", letterSpacing: "-0.5px" }}>AG</span>
-          <span style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: "800", color: "#0095da", letterSpacing: "-0.5px" }}>/</span>
-          <span style={{ fontSize: isMobile ? "18px" : "22px", fontWeight: "800", color: "#f1f5f9", letterSpacing: "-0.5px" }}>E</span>
-          {!isMobile && <span style={{ marginLeft: "10px", fontSize: "14px", color: "#777f8f", fontWeight: "500" }}>QC Checklist</span>}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <AgeLogo height={isMobile ? 20 : 24} />
+          {!isMobile && <span style={{ fontSize: "13px", color: "#777f8f", fontWeight: "500", letterSpacing: "0.04em" }}>QC Checklist</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? "8px" : "12px" }}>
           <button onClick={onShowDashboard} style={{

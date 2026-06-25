@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
 import { CATEGORIES } from "../checklistTemplate";
 import { useIsMobile } from "../useIsMobile";
+import AgeLogo from "./AgeLogo";
 
 export default function ChecklistView({ project, userRole, session, onBack, onSignOut }) {
   const isMobile = useIsMobile();
@@ -374,9 +375,12 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               ←
             </button>
             <div style={{ minWidth: 0 }}>
-              <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "18px", fontWeight: "700", color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {project.name}
-              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                {!isMobile && <AgeLogo height={18} />}
+                <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "16px", fontWeight: "700", color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {project.name}
+                </h1>
+              </div>
               <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>
                 {completedItems} done · {naItems} N/A · {pendingItems} pending · {overallProgress}%
               </p>
