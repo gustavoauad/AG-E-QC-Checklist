@@ -617,33 +617,8 @@ function MembersTab({ project, session }) {
       .select("id, full_name, email").eq("email", trimmedEmail).single();
 
     if (!found) {
-      // User not registered — generate an invite token and email them the join link
-      const { data: tokenRow } = await supabase.from("project_invite_tokens")
-        .insert({ project_id: project.id, role, created_by: session.user.id })
-        .select().single();
-
-      if (tokenRow) {
-        const inviteUrl = `${appBase}?invite=${tokenRow.token}`;
-        try {
-          await supabase.functions.invoke("send-invite-email", {
-            body: {
-              to: trimmedEmail,
-              inviteeName: null,
-              inviterName,
-              projectName: project.name,
-              role,
-              appUrl: inviteUrl,
-              isNewUser: true,
-            },
-          });
-        } catch (_) { /* silent */ }
-      }
-
-      setError("");
+      setError("No registered user found with that email. They must create an account first.");
       setInviting(false);
-      setEmail("");
-      // Show success info instead of error
-      alert(`"${trimmedEmail}" is not registered yet. An invitation email has been sent with a link to join "${project.name}" after signing up.`);
       return;
     }
 
