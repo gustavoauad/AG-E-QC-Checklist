@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { CATEGORIES } from "../checklistTemplate";
+import { CATEGORIES, CHECKLIST_TEMPLATE } from "../checklistTemplate";
 import { useIsMobile } from "../useIsMobile";
 import AgeLogo from "./AgeLogo";
 import NotificationBell from "./NotificationBell";
@@ -22,6 +22,8 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const [activeMilestoneId, setActiveMilestoneId] = useState(null);
   const [milestoneItemsCache, setMilestoneItemsCache] = useState({});
   const [milestoneLoading, setMilestoneLoading] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all"); // all | pending | complete | na
+  const [filterPhase, setFilterPhase] = useState("all");   // all | SD | DD | CD
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -195,7 +197,17 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : "";
 
-  const categoryItems = checklists.filter((c) => c.category === activeCategory);
+  // Phase lookup from template (item_id → phase)
+  const phaseMap = {};
+  CHECKLIST_TEMPLATE.forEach((t) => { if (t.phase) phaseMap[t.item_id] = t.phase; });
+
+  const applyFilters = (items) => items.filter((item) => {
+    if (filterStatus !== "all" && (item.status || "pending") !== filterStatus) return false;
+    if (filterPhase !== "all" && phaseMap[item.item_id] !== filterPhase) return false;
+    return true;
+  });
+
+  const categoryItems = applyFilters(checklists.filter((c) => c.category === activeCategory));
   const groupedCategoryItems = categoryItems.reduce((acc, item) => {
     const key = item.sub_section || "General";
     if (!acc[key]) acc[key] = [];
@@ -204,7 +216,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   }, {});
 
   const activeMilestoneItemIds = activeMilestoneId ? (milestoneItemsCache[activeMilestoneId] || null) : null;
-  const milestoneItems = activeMilestoneItemIds ? checklists.filter((c) => activeMilestoneItemIds.has(c.id)) : [];
+  const milestoneItems = activeMilestoneItemIds ? applyFilters(checklists.filter((c) => activeMilestoneItemIds.has(c.id))) : [];
   const groupedMilestoneItems = milestoneItems.reduce((acc, item) => {
     const catLabel = getCatLabel(item.category);
     const key = item.sub_section ? `${catLabel} — ${item.sub_section}` : catLabel;
@@ -429,6 +441,55 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             {label}
           </button>
         ))}
+      </div>
+
+      {/* Filter bar */}
+      <div style={{ background: "#0f172a", borderBottom: "1px solid #243044", padding: isMobile ? "8px 12px" : "8px 20px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Filter:</span>
+
+        {/* Phase filter */}
+        {["all", "SD", "DD", "CD"].map((p) => (
+          <button key={p} onClick={() => setFilterPhase(p)} style={{
+            padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
+            fontSize: "12px", fontWeight: "600", cursor: "pointer",
+            background: filterPhase === p ? "#012d5a" : "transparent",
+            borderColor: filterPhase === p ? "#0095da" : "#334155",
+            color: filterPhase === p ? "#33bdef" : "#64748b",
+          }}>
+            {p === "all" ? "All Phases" : p}
+          </button>
+        ))}
+
+        <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+
+        {/* Status filter */}
+        {[
+          { id: "all", label: "All Status" },
+          { id: "pending", label: "Pending" },
+          { id: "complete", label: "Complete" },
+          { id: "na", label: "N/A" },
+        ].map(({ id, label }) => (
+          <button key={id} onClick={() => setFilterStatus(id)} style={{
+            padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
+            fontSize: "12px", fontWeight: "600", cursor: "pointer",
+            background: filterStatus === id ? (id === "complete" ? "#1a3318" : id === "pending" ? "#0c1a2e" : id === "na" ? "#1c1917" : "#1e293b") : "transparent",
+            borderColor: filterStatus === id ? (id === "complete" ? "#4da447" : id === "pending" ? "#0095da" : id === "na" ? "#78716c" : "#334155") : "#334155",
+            color: filterStatus === id ? (id === "complete" ? "#7ecb7b" : id === "pending" ? "#33bdef" : id === "na" ? "#a8a29e" : "#f1f5f9") : "#64748b",
+          }}>
+            {label}
+          </button>
+        ))}
+
+        {/* Clear filters */}
+        {(filterPhase !== "all" || filterStatus !== "all") && (
+          <button onClick={() => { setFilterPhase("all"); setFilterStatus("all"); }} style={{
+            padding: "4px 10px", borderRadius: "20px", border: "1px solid #ef4444",
+            fontSize: "11px", fontWeight: "600", cursor: "pointer",
+            background: "transparent", color: "#ef4444", marginLeft: "4px",
+          }}>
+            ✕ Clear
+          </button>
+        )}
       </div>
 
       {/* Mobile: horizontal pill selector */}
