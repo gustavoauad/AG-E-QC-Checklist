@@ -553,12 +553,6 @@ function MilestonesTab({ project }) {
 }
 
 // ── Members tab ────────────────────────────────────────────────────────────
-const ROLE_LABELS = {
-  project_manager: "Project Manager",
-  engineer: "Engineer",
-  drafter: "Drafter",
-};
-
 function MembersTab({ project, session }) {
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState("");
@@ -566,21 +560,48 @@ function MembersTab({ project, session }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [myProfile, setMyProfile] = useState(null);
+  // QR invite token
+  const [inviteToken, setInviteToken] = useState(null);
+  const [qrRole, setQrRole] = useState("engineer");
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  useEffect(() => { fetchMembers(); }, []);
+  useEffect(() => {
+    fetchMembers();
+    fetchMyProfile();
+    fetchInviteToken();
+  }, []);
+
+  const fetchMyProfile = async () => {
+    const { data } = await supabase.from("profiles").select("full_name").eq("id", session.user.id).single();
+    setMyProfile(data);
+  };
 
   const fetchMembers = async () => {
     const { data: rows } = await supabase.from("project_members")
       .select("id, user_id, role").eq("project_id", project.id);
     if (!rows) { setLoading(false); return; }
-
     const ids = rows.map((r) => r.user_id);
     const { data: profiles } = await supabase.from("profiles").select("id, full_name, email").in("id", ids);
     const pMap = {};
     profiles?.forEach((p) => { pMap[p.id] = p; });
-
     setMembers(rows.map((r) => ({ ...r, profile: pMap[r.user_id] })));
     setLoading(false);
+  };
+
+  const fetchInviteToken = async () => {
+    const { data } = await supabase
+      .from("project_invite_tokens")
+      .select("*")
+      .eq("project_id", project.id)
+      .eq("created_by", session.user.id)
+      .gte("expires_at", new Date().toISOString())
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (data) { setInviteToken(data); setQrRole(data.role); }
   };
 
   const invite = async (e) => {
@@ -589,10 +610,10 @@ function MembersTab({ project, session }) {
     setError("");
 
     const { data: found } = await supabase.from("profiles")
-      .select("id, full_name").eq("email", email.toLowerCase().trim()).single();
+      .select("id, full_name, email").eq("email", email.toLowerCase().trim()).single();
 
     if (!found) {
-      setError("No user found with that email. They must register first.");
+      setError("No registered user found with that email. Share the QR code below so they can join after registering.");
       setInviting(false);
       return;
     }
@@ -605,8 +626,59 @@ function MembersTab({ project, session }) {
     const { error: err } = await supabase.from("project_members").insert({
       project_id: project.id, user_id: found.id, role, invited_by: session.user.id,
     });
-    if (err) { setError(err.message); } else { setEmail(""); fetchMembers(); }
+
+    if (err) { setError(err.message); setInviting(false); return; }
+
+    // In-app notification for the invitee
+    const inviterName = myProfile?.full_name || session.user.email;
+    await supabase.from("notifications").insert({
+      user_id: found.id,
+      project_id: project.id,
+      type: "project_invite",
+      title: `You've been added to "${project.name}"`,
+      body: `${inviterName} added you as ${role.replace(/_/g, " ")}. Open your projects to get started.`,
+    });
+
+    // Try to send email via edge function (optional — fails silently if not deployed)
+    try {
+      await supabase.functions.invoke("send-invite-email", {
+        body: {
+          to: found.email || email,
+          inviteeName: found.full_name,
+          inviterName,
+          projectName: project.name,
+          role,
+          appUrl: window.location.origin + window.location.pathname,
+        },
+      });
+    } catch (_) { /* Edge function not deployed — ignore */ }
+
+    setEmail("");
+    fetchMembers();
     setInviting(false);
+  };
+
+  const generateToken = async () => {
+    setGeneratingToken(true);
+    // Remove old tokens for this project by this user
+    await supabase.from("project_invite_tokens")
+      .delete().eq("project_id", project.id).eq("created_by", session.user.id);
+    const { data } = await supabase.from("project_invite_tokens")
+      .insert({ project_id: project.id, role: qrRole, created_by: session.user.id })
+      .select().single();
+    setInviteToken(data);
+    setShowQR(true);
+    setGeneratingToken(false);
+  };
+
+  const inviteUrl = inviteToken
+    ? `${window.location.origin}${window.location.pathname}?invite=${inviteToken.token}`
+    : "";
+
+  const copyLink = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const updateRole = async (memberId, newRole) => {
@@ -621,13 +693,15 @@ function MembersTab({ project, session }) {
 
   return (
     <div>
-      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: 0 }}>
-        Invite team members by their registered email and assign their role.
+      <p style={{ color: "#94a3b8", fontSize: "13px", marginTop: 0, marginBottom: "16px" }}>
+        Invite registered members by email, or share a QR code for anyone to join.
       </p>
 
-      <form onSubmit={invite} style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "20px" }}>
+      {/* Invite by email */}
+      <form onSubmit={invite} style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "16px", border: "1px solid #334155" }}>
+        <p style={{ color: "#33bdef", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Invite by Email</p>
         {error && (
-          <div style={{ color: "#fca5a5", fontSize: "13px", marginBottom: "12px", background: "#450a0a", padding: "8px 12px", borderRadius: "6px" }}>
+          <div style={{ color: "#fca5a5", fontSize: "13px", marginBottom: "12px", background: "#450a0a", padding: "8px 12px", borderRadius: "6px", border: "1px solid #ef4444" }}>
             {error}
           </div>
         )}
@@ -656,6 +730,61 @@ function MembersTab({ project, session }) {
         </div>
       </form>
 
+      {/* QR Code invite */}
+      <div style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "20px", border: "1px solid #334155" }}>
+        <p style={{ color: "#33bdef", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>QR Code Invite Link</p>
+        <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", marginBottom: "14px" }}>
+          <div style={{ flex: 1 }}>
+            <label style={labelStyle}>Role for QR invitees</label>
+            <select value={qrRole} onChange={(e) => setQrRole(e.target.value)} style={inputStyle}>
+              <option value="project_manager">Project Manager</option>
+              <option value="engineer">Engineer</option>
+              <option value="drafter">Drafter</option>
+            </select>
+          </div>
+          <button onClick={generatingToken ? undefined : generateToken} disabled={generatingToken} style={{
+            padding: "10px 16px", background: "#29439b", color: "white", border: "none",
+            borderRadius: "8px", cursor: generatingToken ? "not-allowed" : "pointer",
+            fontSize: "13px", fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0,
+          }}>
+            {generatingToken ? "..." : inviteToken ? "↻ Regenerate" : "Generate QR"}
+          </button>
+        </div>
+
+        {inviteToken && (
+          <>
+            <button
+              onClick={() => setShowQR((v) => !v)}
+              style={{ width: "100%", padding: "8px", background: showQR ? "#012d5a" : "#1e293b", color: showQR ? "#33bdef" : "#94a3b8", border: `1px solid ${showQR ? "#0095da" : "#334155"}`, borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600", marginBottom: showQR ? "14px" : 0 }}>
+              {showQR ? "▲ Hide QR Code" : "▼ Show QR Code"}
+            </button>
+
+            {showQR && (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px" }}>
+                <div style={{ background: "white", padding: "12px", borderRadius: "10px", display: "inline-block" }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteUrl)}`}
+                    alt="QR invite code"
+                    width={200} height={200}
+                    style={{ display: "block" }}
+                  />
+                </div>
+                <div style={{ width: "100%", background: "#1e293b", borderRadius: "6px", padding: "8px 12px", border: "1px solid #334155", display: "flex", gap: "8px", alignItems: "center" }}>
+                  <span style={{ flex: 1, fontSize: "11px", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{inviteUrl}</span>
+                  <button onClick={copyLink} style={{ padding: "4px 12px", background: copied ? "#1a3318" : "#012d5a", color: copied ? "#7ecb7b" : "#33bdef", border: `1px solid ${copied ? "#4da447" : "#0095da"}`, borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600", flexShrink: 0 }}>
+                    {copied ? "✓ Copied" : "Copy"}
+                  </button>
+                </div>
+                <p style={{ color: "#64748b", fontSize: "11px", margin: 0, textAlign: "center" }}>
+                  Expires {new Date(inviteToken.expires_at).toLocaleDateString()} · Role: <strong style={{ color: "#94a3b8" }}>{qrRole.replace(/_/g, " ")}</strong>
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Members list */}
       {loading ? (
         <p style={{ color: "#94a3b8" }}>Loading members...</p>
       ) : (
@@ -663,32 +792,22 @@ function MembersTab({ project, session }) {
           {members.map((m) => (
             <div key={m.id} style={{
               display: "flex", justifyContent: "space-between", alignItems: "center",
-              padding: "12px 16px", background: "#0f172a", borderRadius: "8px", border: "1px solid #334155",
+              padding: "12px 16px", background: "#0f172a", borderRadius: "8px", border: "1px solid #334155", flexWrap: "wrap", gap: "8px",
             }}>
               <div>
-                <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>
-                  {m.profile?.full_name || "Unknown"}
-                </span>
+                <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.profile?.full_name || "Unknown"}</span>
                 <span style={{ color: "#64748b", fontSize: "12px", marginLeft: "8px" }}>{m.profile?.email}</span>
-                {m.user_id === session.user.id && (
-                  <span style={{ color: "#64748b", fontSize: "11px", marginLeft: "6px" }}>(you)</span>
-                )}
+                {m.user_id === session.user.id && <span style={{ color: "#64748b", fontSize: "11px", marginLeft: "6px" }}>(you)</span>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <select
-                  value={m.role}
-                  onChange={(e) => updateRole(m.id, e.target.value)}
-                  disabled={m.user_id === session.user.id}
+                <select value={m.role} onChange={(e) => updateRole(m.id, e.target.value)} disabled={m.user_id === session.user.id}
                   style={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9", borderRadius: "6px", padding: "5px 8px", fontSize: "12px" }}>
                   <option value="project_manager">Project Manager</option>
                   <option value="engineer">Engineer</option>
                   <option value="drafter">Drafter</option>
                 </select>
                 {m.user_id !== session.user.id && (
-                  <button onClick={() => removeMember(m.id)} style={{
-                    background: "none", border: "1px solid #334155", color: "#ef4444",
-                    cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px",
-                  }}>
+                  <button onClick={() => removeMember(m.id)} style={{ background: "none", border: "1px solid #334155", color: "#ef4444", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px" }}>
                     Remove
                   </button>
                 )}
