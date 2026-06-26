@@ -4,11 +4,11 @@ import { CATEGORIES, CHECKLIST_TEMPLATE } from "../checklistTemplate";
 import { useIsMobile } from "../useIsMobile";
 
 const inputStyle = {
-  width: "100%", padding: "10px 12px", background: "#0f172a",
-  border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9",
+  width: "100%", padding: "10px 12px", background: "var(--c-bg)",
+  border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)",
   fontSize: "14px", boxSizing: "border-box", fontFamily: "Manrope, sans-serif",
 };
-const labelStyle = { display: "block", color: "#94a3b8", fontSize: "13px", marginBottom: "6px" };
+const labelStyle = { display: "block", color: "var(--c-text-2)", fontSize: "13px", marginBottom: "6px" };
 
 // ── Organization tab ────────────────────────────────────────────────────────
 function OrgTab({ org, orgRole, onOrgRenamed }) {
@@ -27,7 +27,7 @@ function OrgTab({ org, orgRole, onOrgRenamed }) {
 
   return (
     <div style={{ maxWidth: "480px" }}>
-      <h3 style={{ color: "#f1f5f9", margin: "0 0 20px", fontSize: "16px" }}>Organization Details</h3>
+      <h3 style={{ color: "var(--c-text)", margin: "0 0 20px", fontSize: "16px" }}>Organization Details</h3>
       <form onSubmit={save}>
         <div style={{ marginBottom: "20px" }}>
           <label style={labelStyle}>Organization Name</label>
@@ -38,14 +38,14 @@ function OrgTab({ org, orgRole, onOrgRenamed }) {
         </div>
         {orgRole === "admin" && (
           <button type="submit" disabled={saving || !name.trim() || name.trim() === org.name} style={{
-            padding: "10px 24px", background: "#0095da", color: "white", border: "none",
+            padding: "10px 24px", background: "var(--c-accent)", color: "white", border: "none",
             borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600", fontFamily: "Manrope, sans-serif",
           }}>
             {saved ? "✓ Saved" : saving ? "Saving..." : "Save Changes"}
           </button>
         )}
         {orgRole !== "admin" && (
-          <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>Only admins can edit organization settings.</p>
+          <p style={{ color: "var(--c-text-3)", fontSize: "13px", margin: 0 }}>Only admins can edit organization settings.</p>
         )}
       </form>
     </div>
@@ -143,14 +143,14 @@ function MembersTab({ org, session, orgRole }) {
 
   return (
     <div>
-      <h3 style={{ color: "#f1f5f9", margin: "0 0 20px", fontSize: "16px" }}>Organization Members</h3>
+      <h3 style={{ color: "var(--c-text)", margin: "0 0 20px", fontSize: "16px" }}>Organization Members</h3>
 
       {/* Invite form (admin only) */}
       {orgRole === "admin" && (
-        <form onSubmit={invite} style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "20px", border: "1px solid #334155" }}>
-          <p style={{ color: "#33bdef", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Invite Member</p>
+        <form onSubmit={invite} style={{ background: "var(--c-bg)", borderRadius: "8px", padding: "16px", marginBottom: "20px", border: "1px solid #334155" }}>
+          <p style={{ color: "var(--c-accent-lt)", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Invite Member</p>
           {error && (
-            <div style={{ color: "#fca5a5", fontSize: "13px", marginBottom: "12px", background: "#450a0a", padding: "8px 12px", borderRadius: "6px", border: "1px solid #ef4444" }}>{error}</div>
+            <div style={{ color: "var(--c-err-text)", fontSize: "13px", marginBottom: "12px", background: "var(--c-err-bg)", padding: "8px 12px", borderRadius: "6px", border: "1px solid #ef4444" }}>{error}</div>
           )}
           <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: 2, minWidth: "180px" }}>
@@ -165,7 +165,7 @@ function MembersTab({ org, session, orgRole }) {
               </select>
             </div>
             <button type="submit" disabled={inviting} style={{
-              padding: "10px 18px", background: "#0095da", color: "white", border: "none",
+              padding: "10px 18px", background: "var(--c-accent)", color: "white", border: "none",
               borderRadius: "8px", cursor: inviting ? "not-allowed" : "pointer", fontSize: "14px",
               fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0, fontFamily: "Manrope, sans-serif",
             }}>
@@ -177,25 +177,25 @@ function MembersTab({ org, session, orgRole }) {
 
       {/* Members list */}
       {loading ? (
-        <p style={{ color: "#94a3b8" }}>Loading members...</p>
+        <p style={{ color: "var(--c-text-2)" }}>Loading members...</p>
       ) : (
         <div style={{ display: "grid", gap: "8px" }}>
           {members.map((m) => (
-            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#0f172a", borderRadius: "8px", border: "1px solid #334155", flexWrap: "wrap", gap: "8px" }}>
+            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--c-bg)", borderRadius: "8px", border: "1px solid #334155", flexWrap: "wrap", gap: "8px" }}>
               <div>
-                <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.profile?.full_name || "Unknown"}</span>
-                <span style={{ color: "#64748b", fontSize: "12px", marginLeft: "8px" }}>{m.profile?.email}</span>
-                {m.user_id === session.user.id && <span style={{ color: "#64748b", fontSize: "11px", marginLeft: "6px" }}>(you)</span>}
+                <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{m.profile?.full_name || "Unknown"}</span>
+                <span style={{ color: "var(--c-text-3)", fontSize: "12px", marginLeft: "8px" }}>{m.profile?.email}</span>
+                {m.user_id === session.user.id && <span style={{ color: "var(--c-text-3)", fontSize: "11px", marginLeft: "6px" }}>(you)</span>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <select value={m.role} onChange={(e) => updateRole(m.id, e.target.value)}
                   disabled={orgRole !== "admin" || m.user_id === session.user.id}
-                  style={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9", borderRadius: "6px", padding: "5px 8px", fontSize: "12px" }}>
+                  style={{ background: "var(--c-surface)", border: "1px solid #334155", color: "var(--c-text)", borderRadius: "6px", padding: "5px 8px", fontSize: "12px" }}>
                   <option value="admin">Admin</option>
                   <option value="user">User</option>
                 </select>
                 {orgRole === "admin" && m.user_id !== session.user.id && (
-                  <button onClick={() => removeMember(m.id)} style={{ background: "none", border: "1px solid #334155", color: "#ef4444", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px" }}>
+                  <button onClick={() => removeMember(m.id)} style={{ background: "none", border: "1px solid #334155", color: "var(--c-err)", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px" }}>
                     Remove
                   </button>
                 )}
@@ -593,7 +593,7 @@ function ChecklistsTab({ org, orgRole }) {
 
   const getLabel = (cat) => config[cat.id]?.label || cat.label;
 
-  if (loading) return <p style={{ color: "#94a3b8" }}>Loading...</p>;
+  if (loading) return <p style={{ color: "var(--c-text-2)" }}>Loading...</p>;
 
   const allCats = [
     ...CATEGORIES.map((c) => ({ ...c, isCustom: false })),
@@ -602,7 +602,7 @@ function ChecklistsTab({ org, orgRole }) {
 
   const mBtn = (extra = {}) => ({
     padding: "3px 7px", background: "transparent", border: "1px solid #334155",
-    color: "#64748b", borderRadius: "4px", cursor: "pointer", fontSize: "11px",
+    color: "var(--c-text-3)", borderRadius: "4px", cursor: "pointer", fontSize: "11px",
     fontFamily: "Manrope, sans-serif", ...extra,
   });
 
@@ -610,8 +610,8 @@ function ChecklistsTab({ org, orgRole }) {
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
         <div>
-          <h3 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: "16px" }}>Default Checklists</h3>
-          <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>
+          <h3 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: "16px" }}>Default Checklists</h3>
+          <p style={{ color: "var(--c-text-3)", fontSize: "13px", margin: 0 }}>
             {orgRole === "admin"
               ? "Customize categories, sections, and items. New projects inherit these defaults."
               : "Default checklist configuration for this organization."}
@@ -619,7 +619,7 @@ function ChecklistsTab({ org, orgRole }) {
         </div>
         {orgRole === "admin" && (
           <button onClick={() => setAddingCat(true)} style={{
-            padding: "8px 16px", background: "#0095da", color: "white", border: "none",
+            padding: "8px 16px", background: "var(--c-accent)", color: "white", border: "none",
             borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600",
             fontFamily: "Manrope, sans-serif", flexShrink: 0,
           }}>
@@ -630,22 +630,22 @@ function ChecklistsTab({ org, orgRole }) {
 
       {/* New checklist form */}
       {addingCat && (
-        <div style={{ background: "#0f172a", border: "1px solid #0095da", borderRadius: "10px", padding: "14px 16px", marginBottom: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+        <div style={{ background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "10px", padding: "14px 16px", marginBottom: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
           <input
             autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addCustomCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCatName(""); } }}
             placeholder="Checklist name (e.g. MEP Coordination)"
-            style={{ flex: 1, padding: "8px 12px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "7px", color: "#f1f5f9", fontSize: "14px", fontFamily: "Manrope, sans-serif" }}
+            style={{ flex: 1, padding: "8px 12px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "7px", color: "var(--c-text)", fontSize: "14px", fontFamily: "Manrope, sans-serif" }}
           />
           <button onClick={addCustomCategory} disabled={savingCat || !newCatName.trim()} style={{
-            padding: "8px 16px", background: "#0095da", color: "white", border: "none",
+            padding: "8px 16px", background: "var(--c-accent)", color: "white", border: "none",
             borderRadius: "7px", cursor: savingCat ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "600",
           }}>
             {savingCat ? "..." : "Create"}
           </button>
           <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{
             padding: "8px 12px", background: "transparent", border: "1px solid #334155",
-            color: "#94a3b8", borderRadius: "7px", cursor: "pointer", fontSize: "13px",
+            color: "var(--c-text-2)", borderRadius: "7px", cursor: "pointer", fontSize: "13px",
           }}>×</button>
         </div>
       )}
@@ -660,8 +660,8 @@ function ChecklistsTab({ org, orgRole }) {
 
           return (
             <div key={cat.id} style={{
-              background: "#0f172a", borderRadius: "10px",
-              border: `1px solid ${isExpanded ? "#0095da" : enabled ? "#334155" : "#1e293b"}`,
+              background: "var(--c-bg)", borderRadius: "10px",
+              border: `1px solid ${isExpanded ? "var(--c-accent)" : enabled ? "var(--c-border)" : "var(--c-surface)"}`,
               overflow: "hidden", opacity: enabled ? 1 : 0.6,
             }}>
               {/* Category header row */}
@@ -670,9 +670,9 @@ function ChecklistsTab({ org, orgRole }) {
                   <button onClick={() => toggleCategory(cat.id)} style={{
                     padding: "3px 10px", borderRadius: "20px", border: "1px solid",
                     fontSize: "10px", fontWeight: "700", cursor: "pointer", flexShrink: 0,
-                    background: enabled ? "#1a3318" : "#1e293b",
-                    borderColor: enabled ? "#4da447" : "#334155",
-                    color: enabled ? "#7ecb7b" : "#64748b",
+                    background: enabled ? "var(--c-ok-bg)" : "var(--c-surface)",
+                    borderColor: enabled ? "var(--c-ok)" : "var(--c-border)",
+                    color: enabled ? "var(--c-ok-text)" : "var(--c-text-3)",
                   }}>
                     {enabled ? "ON" : "OFF"}
                   </button>
@@ -682,19 +682,19 @@ function ChecklistsTab({ org, orgRole }) {
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <input autoFocus value={renameText} onChange={(e) => setRenameText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") saveCategoryRename(cat.id); if (e.key === "Escape") setRenamingCat(null); }}
-                        style={{ flex: 1, padding: "5px 8px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "6px", color: "#f1f5f9", fontSize: "13px" }}
+                        style={{ flex: 1, padding: "5px 8px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "6px", color: "var(--c-text)", fontSize: "13px" }}
                       />
-                      <button onClick={() => saveCategoryRename(cat.id)} style={{ padding: "4px 10px", background: "#0095da", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Save</button>
-                      <button onClick={() => setRenamingCat(null)} style={{ padding: "4px 8px", background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: "5px", cursor: "pointer", fontSize: "12px" }}>×</button>
+                      <button onClick={() => saveCategoryRename(cat.id)} style={{ padding: "4px 10px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Save</button>
+                      <button onClick={() => setRenamingCat(null)} style={{ padding: "4px 8px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-2)", borderRadius: "5px", cursor: "pointer", fontSize: "12px" }}>×</button>
                     </div>
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{getLabel(cat)}</span>
+                      <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{getLabel(cat)}</span>
                       {cat.isCustom && (
-                        <span style={{ fontSize: "10px", color: "#0095da", background: "#012d5a", padding: "1px 7px", borderRadius: "20px", fontWeight: "600" }}>custom</span>
+                        <span style={{ fontSize: "10px", color: "var(--c-accent)", background: "var(--c-accent-dk)", padding: "1px 7px", borderRadius: "20px", fontWeight: "600" }}>custom</span>
                       )}
                       {!cat.isCustom && config[cat.id]?.label && config[cat.id].label !== cat.label && (
-                        <span style={{ color: "#64748b", fontSize: "11px" }}>({cat.label})</span>
+                        <span style={{ color: "var(--c-text-3)", fontSize: "11px" }}>({cat.label})</span>
                       )}
                     </div>
                   )}
@@ -707,18 +707,18 @@ function ChecklistsTab({ org, orgRole }) {
                     }}>↗ Push</button>
                     <button onClick={() => { setRenamingCat(cat.id); setRenameText(getLabel(cat)); }} style={{
                       padding: "3px 8px", background: "transparent", border: "1px solid #334155",
-                      color: "#64748b", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
+                      color: "var(--c-text-3)", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
                     }}>Rename</button>
                     {cat.isCustom && (
                       <button onClick={() => deleteCustomCategory(cat.id)} style={{
                         padding: "3px 7px", background: "transparent", border: "1px solid #334155",
-                        color: "#ef4444", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
+                        color: "var(--c-err)", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
                       }}>✕</button>
                     )}
                   </div>
                 )}
                 <button onClick={() => expandCat(cat.id)} style={{
-                  background: "none", border: "none", color: isExpanded ? "#0095da" : "#64748b",
+                  background: "none", border: "none", color: isExpanded ? "var(--c-accent)" : "var(--c-text-3)",
                   cursor: "pointer", padding: "4px 6px", fontSize: "13px", flexShrink: 0,
                 }}>
                   {isExpanded ? "▲" : "▼"}
@@ -729,7 +729,7 @@ function ChecklistsTab({ org, orgRole }) {
               {isExpanded && (
                 <div style={{ borderTop: "1px solid #1e293b", padding: "12px 16px" }}>
                   {catItems === undefined ? (
-                    <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Loading items...</p>
+                    <p style={{ color: "var(--c-text-2)", fontSize: "13px", margin: 0 }}>Loading items...</p>
                   ) : (
                     <>
                       {/* ── Sections ─────────────────────────────────────── */}
@@ -752,15 +752,15 @@ function ChecklistsTab({ org, orgRole }) {
                               style={{
                                 display: "flex", alignItems: "center", gap: "8px",
                                 padding: "6px 10px 6px 8px",
-                                background: isSectionDragTarget ? "#012d5a" : isOrderTarget ? "#0d2340" : "#0c1a28",
-                                borderLeft: `3px solid ${isSectionDragTarget ? "#f59e0b" : "#0095da"}`,
+                                background: isSectionDragTarget ? "var(--c-accent-dk)" : isOrderTarget ? "var(--c-surface-alt)" : "var(--c-surface-alt)",
+                                borderLeft: `3px solid ${isSectionDragTarget ? "var(--c-warn)" : "var(--c-accent)"}`,
                                 borderRadius: "0 6px 6px 0", marginBottom: "4px",
                                 cursor: orgRole === "admin" && !isRenamingThisSection ? "grab" : "default",
                                 transition: "background 0.12s",
                               }}
                             >
                               {orgRole === "admin" && (
-                                <span style={{ color: "#475569", fontSize: "14px", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                                <span style={{ color: "var(--c-text-4)", fontSize: "14px", userSelect: "none", flexShrink: 0 }}>⠿</span>
                               )}
                               {isRenamingThisSection ? (
                                 <div style={{ display: "flex", gap: "6px", flex: 1, alignItems: "center" }}
@@ -772,26 +772,26 @@ function ChecklistsTab({ org, orgRole }) {
                                       if (e.key === "Enter") renameSection(cat.id, section.label);
                                       if (e.key === "Escape") setRenamingSection(null);
                                     }}
-                                    style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "12px" }}
+                                    style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px" }}
                                   />
                                   <button onClick={() => renameSection(cat.id, section.label)}
-                                    style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                    style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button>
                                   <button onClick={() => setRenamingSection(null)} style={mBtn()}>×</button>
                                 </div>
                               ) : (
                                 <>
-                                  <span style={{ flex: 1, color: "#7dd3fc", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                  <span style={{ flex: 1, color: "var(--c-accent-lt)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                                     {section.label}
                                   </span>
                                   {isSectionDragTarget && (
-                                    <span style={{ color: "#f59e0b", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>
+                                    <span style={{ color: "var(--c-warn)", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>
                                   )}
                                   {orgRole === "admin" && (
                                     <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                       <button onClick={() => { setRenamingSection({ catId: cat.id, label: section.label }); setRenameSectionText(section.label); }}
                                         style={mBtn()}>Rename</button>
                                       <button onClick={() => deleteSection(cat.id, section.label)}
-                                        style={mBtn({ color: "#ef4444" })}>✕</button>
+                                        style={mBtn({ color: "var(--c-err)" })}>✕</button>
                                     </div>
                                   )}
                                 </>
@@ -814,35 +814,35 @@ function ChecklistsTab({ org, orgRole }) {
                                     style={{
                                       display: "flex", alignItems: "center", gap: "8px",
                                       padding: "6px 10px", borderRadius: "0 6px 6px 0",
-                                      borderLeft: `2px solid ${isItemDragOver ? "#0095da" : "#29439b"}`,
-                                      background: isItemDragOver ? "#012d5a" : "#1a2a3a",
+                                      borderLeft: `2px solid ${isItemDragOver ? "var(--c-accent)" : "var(--c-accent-2)"}`,
+                                      background: isItemDragOver ? "var(--c-accent-dk)" : "var(--c-surface-item)",
                                       opacity: isItemBeingDragged ? 0.3 : 1,
                                       transition: "background 0.1s",
                                     }}
                                   >
                                     {orgRole === "admin" && (
-                                      <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                                      <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
                                     )}
                                     {editingItemId === item.id ? (
                                       <input autoFocus value={editItemText}
                                         onChange={(e) => setEditItemText(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                        style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                        style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
                                       />
                                     ) : (
-                                      <span style={{ flex: 1, color: "#cbd5e1", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                      <span style={{ flex: 1, color: "var(--c-text-4)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
                                     )}
                                     {orgRole === "admin" && (
                                       <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                         {editingItemId === item.id ? (
                                           <>
-                                            <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                            <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button>
                                             <button onClick={() => setEditingItemId(null)} style={mBtn()}>×</button>
                                           </>
                                         ) : (
                                           <>
                                             <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
-                                            <button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>✕</button>
+                                            <button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>✕</button>
                                           </>
                                         )}
                                       </div>
@@ -860,9 +860,9 @@ function ChecklistsTab({ org, orgRole }) {
                                     onChange={(e) => setNewItemText(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, section.label); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
                                     placeholder="New item text..."
-                                    style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                                    style={{ flex: 1, padding: "6px 9px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                                   />
-                                  <button onClick={() => addItem(cat.id, section.label)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                                  <button onClick={() => addItem(cat.id, section.label)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
                                   <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>×</button>
                                 </div>
                               ) : (
@@ -871,11 +871,11 @@ function ChecklistsTab({ org, orgRole }) {
                                   style={{
                                     display: "block", width: "calc(100% - 12px)", marginLeft: "12px", marginTop: "4px",
                                     padding: "5px", background: "transparent", border: "1px dashed #29439b",
-                                    borderRadius: "5px", color: "#475569", fontSize: "11px", cursor: "pointer",
+                                    borderRadius: "5px", color: "var(--c-text-4)", fontSize: "11px", cursor: "pointer",
                                     fontFamily: "Manrope, sans-serif",
                                   }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#7dd3fc"; }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#29439b"; e.currentTarget.style.color = "#475569"; }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-accent)"; e.currentTarget.style.color = "var(--c-accent-lt)"; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-accent-2)"; e.currentTarget.style.color = "var(--c-text-4)"; }}
                                 >
                                   + Add Item to "{section.label}"
                                 </button>
@@ -895,7 +895,7 @@ function ChecklistsTab({ org, orgRole }) {
                                 {catSections.length > 0 && (
                                   <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                                     <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
-                                    <span style={{ color: "#475569", fontSize: "10px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>No Section</span>
+                                    <span style={{ color: "var(--c-text-4)", fontSize: "10px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>No Section</span>
                                     <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
                                   </div>
                                 )}
@@ -914,35 +914,35 @@ function ChecklistsTab({ org, orgRole }) {
                                         style={{
                                           display: "flex", alignItems: "center", gap: "8px",
                                           padding: "6px 10px", borderRadius: "6px",
-                                          borderLeft: `2px dashed ${isItemDragOver ? "#0095da" : "#334155"}`,
-                                          background: isItemDragOver ? "#012d5a" : "#1e293b",
+                                          borderLeft: `2px dashed ${isItemDragOver ? "var(--c-accent)" : "var(--c-border)"}`,
+                                          background: isItemDragOver ? "var(--c-accent-dk)" : "var(--c-surface)",
                                           opacity: isItemBeingDragged ? 0.3 : 1,
                                           transition: "background 0.1s",
                                         }}
                                       >
                                         {orgRole === "admin" && (
-                                          <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                                          <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
                                         )}
                                         {editingItemId === item.id ? (
                                           <input autoFocus value={editItemText}
                                             onChange={(e) => setEditItemText(e.target.value)}
                                             onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                            style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                            style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
                                           />
                                         ) : (
-                                          <span style={{ flex: 1, color: "#94a3b8", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                          <span style={{ flex: 1, color: "var(--c-text-2)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
                                         )}
                                         {orgRole === "admin" && (
                                           <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                             {editingItemId === item.id ? (
                                               <>
-                                                <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                                <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button>
                                                 <button onClick={() => setEditingItemId(null)} style={mBtn()}>×</button>
                                               </>
                                             ) : (
                                               <>
                                                 <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
-                                                <button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>✕</button>
+                                                <button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>✕</button>
                                               </>
                                             )}
                                           </div>
@@ -962,9 +962,9 @@ function ChecklistsTab({ org, orgRole }) {
                                     onChange={(e) => setNewItemText(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, null); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
                                     placeholder="New item text..."
-                                    style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                                    style={{ flex: 1, padding: "6px 9px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                                   />
-                                  <button onClick={() => addItem(cat.id, null)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                                  <button onClick={() => addItem(cat.id, null)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
                                   <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>×</button>
                                 </div>
                               ) : null
@@ -980,20 +980,20 @@ function ChecklistsTab({ org, orgRole }) {
                             <button onClick={() => setAddingTo({ catId: cat.id, section: null })} style={{
                               flex: 1, padding: "6px 10px", background: "transparent",
                               border: "1px dashed #334155", borderRadius: "6px",
-                              color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                              color: "var(--c-text-3)", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-accent)"; e.currentTarget.style.color = "var(--c-accent-lt)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-3)"; }}>
                               + Add Item (No Section)
                             </button>
                           ) : (
                             <button onClick={() => setAddingTo({ catId: cat.id, section: null })} style={{
                               flex: 1, padding: "6px 10px", background: "transparent",
                               border: "1px dashed #334155", borderRadius: "6px",
-                              color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                              color: "var(--c-text-3)", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-accent)"; e.currentTarget.style.color = "var(--c-accent-lt)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-3)"; }}>
                               + Add Item
                             </button>
                           )}
@@ -1001,9 +1001,9 @@ function ChecklistsTab({ org, orgRole }) {
                             <button onClick={() => { setAddingSection(cat.id); setNewSectionText(""); }} style={{
                               padding: "6px 12px", background: "transparent",
                               border: "1px dashed #0095da", borderRadius: "6px",
-                              color: "#0095da", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                              color: "var(--c-accent)", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
                             }}
-                            onMouseEnter={(e) => { e.currentTarget.style.background = "#012d5a"; }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--c-accent-dk)"; }}
                             onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                               + Add Section
                             </button>
@@ -1014,15 +1014,15 @@ function ChecklistsTab({ org, orgRole }) {
                       {/* Add section form */}
                       {addingSection === cat.id && (
                         <div style={{ display: "flex", gap: "6px", marginTop: "8px", alignItems: "center" }}>
-                          <div style={{ width: "3px", background: "#0095da", borderRadius: "2px", alignSelf: "stretch", flexShrink: 0 }} />
+                          <div style={{ width: "3px", background: "var(--c-accent)", borderRadius: "2px", alignSelf: "stretch", flexShrink: 0 }} />
                           <input
                             autoFocus value={newSectionText}
                             onChange={(e) => setNewSectionText(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter") addSection(cat.id); if (e.key === "Escape") setAddingSection(null); }}
                             placeholder="Section name..."
-                            style={{ flex: 1, padding: "6px 10px", background: "#0c1a28", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                            style={{ flex: 1, padding: "6px 10px", background: "var(--c-surface-alt)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                           />
-                          <button onClick={() => addSection(cat.id)} disabled={!newSectionText.trim()} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Create</button>
+                          <button onClick={() => addSection(cat.id)} disabled={!newSectionText.trim()} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Create</button>
                           <button onClick={() => setAddingSection(null)} style={mBtn({ padding: "6px 9px" })}>×</button>
                         </div>
                       )}
@@ -1038,47 +1038,47 @@ function ChecklistsTab({ org, orgRole }) {
       {/* Push to Project modal */}
       {pushModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "16px" }}>
-          <div style={{ background: "#1e293b", borderRadius: "12px", padding: "28px", width: "100%", maxWidth: "440px", border: "1px solid #334155", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
-            <h3 style={{ color: "#f1f5f9", margin: "0 0 6px", fontSize: "16px", fontFamily: "Manrope, sans-serif" }}>Push to Project</h3>
-            <p style={{ color: "#64748b", fontSize: "13px", margin: "0 0 20px" }}>
-              Send <strong style={{ color: "#33bdef" }}>{pushModal.catLabel}</strong> checklist items to a project.
+          <div style={{ background: "var(--c-surface)", borderRadius: "12px", padding: "28px", width: "100%", maxWidth: "440px", border: "1px solid #334155", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+            <h3 style={{ color: "var(--c-text)", margin: "0 0 6px", fontSize: "16px", fontFamily: "Manrope, sans-serif" }}>Push to Project</h3>
+            <p style={{ color: "var(--c-text-3)", fontSize: "13px", margin: "0 0 20px" }}>
+              Send <strong style={{ color: "var(--c-accent-lt)" }}>{pushModal.catLabel}</strong> checklist items to a project.
             </p>
 
             {pushStatus === "done" ? (
               <div style={{ textAlign: "center" }}>
-                <p style={{ color: "#7ecb7b", fontSize: "15px", marginBottom: "20px" }}>
+                <p style={{ color: "var(--c-ok-text)", fontSize: "15px", marginBottom: "20px" }}>
                   ✓ Checklist pushed to {selectedProjIds.size} project{selectedProjIds.size !== 1 ? "s" : ""}!
                 </p>
-                <button onClick={() => setPushModal(null)} style={{ padding: "10px 28px", background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "8px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}>Close</button>
+                <button onClick={() => setPushModal(null)} style={{ padding: "10px 28px", background: "var(--c-border)", color: "var(--c-text)", border: "none", borderRadius: "8px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}>Close</button>
               </div>
 
             ) : pushStatus === "conflict" ? (
               <div>
                 {pushError && (
-                  <div style={{ background: "#450a0a", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 12px", marginBottom: "14px", color: "#fca5a5", fontSize: "13px" }}>{pushError}</div>
+                  <div style={{ background: "var(--c-err-bg)", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 12px", marginBottom: "14px", color: "var(--c-err-text)", fontSize: "13px" }}>{pushError}</div>
                 )}
-                <div style={{ background: "#451a03", border: "1px solid #f59e0b", borderRadius: "8px", padding: "12px", marginBottom: "16px" }}>
+                <div style={{ background: "var(--c-warn-bg)", border: "1px solid #f59e0b", borderRadius: "8px", padding: "12px", marginBottom: "16px" }}>
                   <p style={{ color: "#fcd34d", margin: "0 0 6px", fontSize: "13px", fontWeight: "600" }}>
                     ⚠ {conflictNames.length} project{conflictNames.length !== 1 ? "s" : ""} already {conflictNames.length !== 1 ? "have" : "has"} this checklist:
                   </p>
-                  <p style={{ color: "#fbbf24", margin: 0, fontSize: "12px" }}>{conflictNames.join(", ")}</p>
+                  <p style={{ color: "var(--c-warn-text)", margin: 0, fontSize: "12px" }}>{conflictNames.join(", ")}</p>
                 </div>
-                <p style={{ color: "#94a3b8", fontSize: "13px", margin: "0 0 12px" }}>How should existing items be handled?</p>
+                <p style={{ color: "var(--c-text-2)", fontSize: "13px", margin: "0 0 12px" }}>How should existing items be handled?</p>
                 <div style={{ display: "grid", gap: "8px" }}>
                   <button onClick={() => executePush("overwrite_keep")} style={{
-                    padding: "12px 16px", background: "#0f2a1a", border: "1px solid #4da447", color: "#7ecb7b",
+                    padding: "12px 16px", background: "#0f2a1a", border: "1px solid #4da447", color: "var(--c-ok-text)",
                     borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600", textAlign: "left", fontFamily: "Manrope, sans-serif",
                   }}>
                     ✓ Keep statuses — update item text, preserve pending / complete / N/A
                   </button>
                   <button onClick={() => executePush("overwrite_reset")} style={{
-                    padding: "12px 16px", background: "#450a0a", border: "1px solid #ef4444", color: "#fca5a5",
+                    padding: "12px 16px", background: "var(--c-err-bg)", border: "1px solid #ef4444", color: "var(--c-err-text)",
                     borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600", textAlign: "left", fontFamily: "Manrope, sans-serif",
                   }}>
                     ↺ Reset all — replace items and reset everything to pending
                   </button>
                   <button onClick={() => { setPushStatus("idle"); setPushError(""); setConflictNames([]); }} style={{
-                    padding: "10px", background: "transparent", border: "1px solid #334155", color: "#94a3b8",
+                    padding: "10px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-2)",
                     borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontFamily: "Manrope, sans-serif",
                   }}>
                     Back
@@ -1088,7 +1088,7 @@ function ChecklistsTab({ org, orgRole }) {
 
             ) : pushStatus === "pushing" || pushStatus === "checking" ? (
               <div style={{ textAlign: "center", padding: "24px 0" }}>
-                <p style={{ color: "#94a3b8", fontSize: "14px", margin: 0 }}>
+                <p style={{ color: "var(--c-text-2)", fontSize: "14px", margin: 0 }}>
                   {pushStatus === "checking" ? "Checking projects..." : "Pushing checklist..."}
                 </p>
               </div>
@@ -1097,9 +1097,9 @@ function ChecklistsTab({ org, orgRole }) {
               <div>
                 {/* Select All */}
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-                  <label style={{ color: "#94a3b8", fontSize: "13px" }}>Select projects to push to:</label>
+                  <label style={{ color: "var(--c-text-2)", fontSize: "13px" }}>Select projects to push to:</label>
                   <button onClick={toggleAll} style={{
-                    background: "transparent", border: "none", color: "#0095da",
+                    background: "transparent", border: "none", color: "var(--c-accent)",
                     cursor: "pointer", fontSize: "12px", fontWeight: "600", fontFamily: "Manrope, sans-serif",
                   }}>
                     {selectedProjIds.size === orgProjects.length && orgProjects.length > 0 ? "Deselect All" : "Select All"}
@@ -1109,31 +1109,31 @@ function ChecklistsTab({ org, orgRole }) {
                 {/* Project list */}
                 <div style={{ maxHeight: "260px", overflowY: "auto", display: "grid", gap: "6px", marginBottom: "20px" }}>
                   {orgProjects.length === 0 ? (
-                    <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>No active projects in this organization.</p>
+                    <p style={{ color: "var(--c-text-3)", fontSize: "13px", margin: 0 }}>No active projects in this organization.</p>
                   ) : orgProjects.map((p) => (
                     <label key={p.id} style={{
                       display: "flex", alignItems: "center", gap: "10px",
-                      padding: "10px 14px", background: selectedProjIds.has(p.id) ? "#012d5a" : "#0f172a",
-                      border: `1px solid ${selectedProjIds.has(p.id) ? "#0095da" : "#334155"}`,
+                      padding: "10px 14px", background: selectedProjIds.has(p.id) ? "var(--c-accent-dk)" : "var(--c-bg)",
+                      border: `1px solid ${selectedProjIds.has(p.id) ? "var(--c-accent)" : "var(--c-border)"}`,
                       borderRadius: "8px", cursor: "pointer", transition: "background 0.1s",
                     }}>
                       <input type="checkbox" checked={selectedProjIds.has(p.id)} onChange={() => toggleProject(p.id)}
-                        style={{ width: "15px", height: "15px", accentColor: "#0095da", flexShrink: 0 }} />
-                      <span style={{ color: "#f1f5f9", fontSize: "14px" }}>{p.name}</span>
+                        style={{ width: "15px", height: "15px", accentColor: "var(--c-accent)", flexShrink: 0 }} />
+                      <span style={{ color: "var(--c-text)", fontSize: "14px" }}>{p.name}</span>
                     </label>
                   ))}
                 </div>
 
                 <div style={{ display: "flex", gap: "8px" }}>
                   <button onClick={() => setPushModal(null)} style={{
-                    flex: 1, padding: "10px", background: "#334155", color: "#f1f5f9",
+                    flex: 1, padding: "10px", background: "var(--c-border)", color: "var(--c-text)",
                     border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontFamily: "Manrope, sans-serif",
                   }}>Cancel</button>
                   <button onClick={checkAndPush} disabled={selectedProjIds.size === 0} style={{
                     flex: 2, padding: "10px", fontWeight: "600", fontSize: "14px", border: "none",
                     borderRadius: "8px", fontFamily: "Manrope, sans-serif",
-                    background: selectedProjIds.size > 0 ? "#0095da" : "#1e293b",
-                    color: selectedProjIds.size > 0 ? "white" : "#475569",
+                    background: selectedProjIds.size > 0 ? "var(--c-accent)" : "var(--c-surface)",
+                    color: selectedProjIds.size > 0 ? "white" : "var(--c-text-4)",
                     cursor: selectedProjIds.size > 0 ? "pointer" : "not-allowed",
                   }}>
                     Push to {selectedProjIds.size || 0} Project{selectedProjIds.size !== 1 ? "s" : ""}
@@ -1157,7 +1157,7 @@ export default function OrgSettings({ session, org, orgRole, onOrgRenamed }) {
 
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "32px 28px", maxWidth: "760px", margin: "0 auto", fontFamily: "Manrope, sans-serif" }}>
-      <h2 style={{ color: "#f1f5f9", margin: "0 0 24px", fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>Settings</h2>
+      <h2 style={{ color: "var(--c-text)", margin: "0 0 24px", fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>Settings</h2>
 
       {/* Tabs */}
       <div style={{ display: "flex", borderBottom: "1px solid #334155", marginBottom: "28px", overflowX: "auto" }}>
@@ -1165,8 +1165,8 @@ export default function OrgSettings({ session, org, orgRole, onOrgRenamed }) {
           <button key={t} onClick={() => setTab(t)} style={{
             padding: "8px 20px", border: "none", background: "transparent", cursor: "pointer",
             fontSize: "14px", fontWeight: tab === t ? "600" : "400",
-            color: tab === t ? "#0095da" : "#94a3b8",
-            borderBottom: `2px solid ${tab === t ? "#0095da" : "transparent"}`,
+            color: tab === t ? "var(--c-accent)" : "var(--c-text-2)",
+            borderBottom: `2px solid ${tab === t ? "var(--c-accent)" : "transparent"}`,
             marginBottom: "-1px", whiteSpace: "nowrap", fontFamily: "Manrope, sans-serif",
           }}>
             {t}

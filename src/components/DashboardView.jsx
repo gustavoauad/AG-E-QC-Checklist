@@ -99,24 +99,24 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontFamily: "Manrope, sans-serif" }}>
+      <div style={{ minHeight: "100vh", background: "var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-text-2)", fontFamily: "Manrope, sans-serif" }}>
         Loading dashboard...
       </div>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "Manrope, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--c-bg)", fontFamily: "Manrope, sans-serif" }}>
       {/* Header */}
-      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: isMobile ? "12px 16px" : "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ background: "var(--c-surface)", borderBottom: "1px solid #334155", padding: isMobile ? "12px 16px" : "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <button onClick={onBack} style={{ background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "13px" }}>
+          <button onClick={onBack} style={{ background: "var(--c-border)", color: "var(--c-text)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "13px" }}>
             ←
           </button>
-          <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "18px", fontWeight: "700", color: "#f1f5f9" }}>Dashboard</h1>
+          <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "18px", fontWeight: "700", color: "var(--c-text)" }}>Dashboard</h1>
         </div>
         <NotificationBell userId={session.user.id} onGoToProjects={onGoToProjects} />
-        <button onClick={onSignOut} style={{ padding: isMobile ? "6px 10px" : "8px 16px", background: "#ef4444", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: isMobile ? "13px" : "14px" }}>
+        <button onClick={onSignOut} style={{ padding: isMobile ? "6px 10px" : "8px 16px", background: "var(--c-err)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: isMobile ? "13px" : "14px" }}>
           {isMobile ? "↩" : "Sign Out"}
         </button>
       </div>
@@ -126,13 +126,13 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
         {/* Overall stat cards */}
         <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2, 1fr)" : "repeat(4, 1fr)", gap: "12px", marginBottom: "24px" }}>
           {[
-            { label: "Projects", value: projects.length, color: "#0095da" },
-            { label: "Overall Progress", value: `${overallPct}%`, color: overallPct === 100 ? "#7ecb7b" : "#f1f5f9" },
-            { label: "Done / N/A", value: overall.complete + overall.na, color: "#7ecb7b" },
-            { label: "Pending", value: overall.pending, color: overall.pending === 0 ? "#7ecb7b" : "#f59e0b" },
+            { label: "Projects", value: projects.length, color: "var(--c-accent)" },
+            { label: "Overall Progress", value: `${overallPct}%`, color: overallPct === 100 ? "var(--c-ok-text)" : "var(--c-text)" },
+            { label: "Done / N/A", value: overall.complete + overall.na, color: "var(--c-ok-text)" },
+            { label: "Pending", value: overall.pending, color: overall.pending === 0 ? "var(--c-ok-text)" : "var(--c-warn)" },
           ].map((stat) => (
-            <div key={stat.label} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "14px" : "20px" }}>
-              <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "12px" }}>{stat.label}</p>
+            <div key={stat.label} style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "14px" : "20px" }}>
+              <p style={{ margin: "0 0 6px", color: "var(--c-text-2)", fontSize: "12px" }}>{stat.label}</p>
               <p style={{ margin: 0, color: stat.color, fontSize: isMobile ? "22px" : "28px", fontWeight: "700" }}>{stat.value}</p>
             </div>
           ))}
@@ -140,23 +140,23 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
 
         {/* Bar chart */}
         {projects.length > 0 && (
-          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
-            <h2 style={{ color: "#f1f5f9", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>
+          <div style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
+            <h2 style={{ color: "var(--c-text)", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>
               Progress by Project (%)
             </h2>
             <ResponsiveContainer width="100%" height={Math.max(160, projects.length * (isMobile ? 40 : 48))}>
               <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 0 : 10, right: 30, top: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 12 }} tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="name" tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 12 }} width={isMobile ? 90 : 130} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 10 : 12 }} tickFormatter={(v) => `${v}%`} />
+                <YAxis type="category" dataKey="name" tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 10 : 12 }} width={isMobile ? 90 : 130} />
                 <Tooltip
-                  contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9" }}
+                  contentStyle={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)" }}
                   formatter={(val) => `${val}%`}
                 />
-                <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
-                <Bar dataKey="Complete" stackId="a" fill="#4da447" />
-                <Bar dataKey="N/A" stackId="a" fill="#78716c" />
-                <Bar dataKey="Pending" stackId="a" fill="#334155" radius={[0, 4, 4, 0]} />
+                <Legend wrapperStyle={{ color: "var(--c-text-2)", fontSize: "12px" }} />
+                <Bar dataKey="Complete" stackId="a" fill="var(--c-ok)" />
+                <Bar dataKey="N/A" stackId="a" fill="var(--c-neutral)" />
+                <Bar dataKey="Pending" stackId="a" fill="var(--c-border)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -164,8 +164,8 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
 
         {/* Upcoming milestones */}
         {milestones.length > 0 && (
-          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: "24px", marginBottom: "32px" }}>
-            <h2 style={{ color: "#f1f5f9", margin: "0 0 16px", fontSize: "16px", fontWeight: "600" }}>
+          <div style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: "24px", marginBottom: "32px" }}>
+            <h2 style={{ color: "var(--c-text)", margin: "0 0 16px", fontSize: "16px", fontWeight: "600" }}>
               Upcoming Milestones
             </h2>
             <div style={{ display: "grid", gap: "8px" }}>
@@ -177,22 +177,22 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
                 return (
                   <div key={m.id} style={{
                     display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 14px", background: "#0f172a", borderRadius: "8px",
-                    border: `1px solid ${isAlert ? "#f59e0b" : "#334155"}`,
+                    padding: "10px 14px", background: "var(--c-bg)", borderRadius: "8px",
+                    border: `1px solid ${isAlert ? "var(--c-warn)" : "var(--c-border)"}`,
                   }}>
                     <div>
-                      <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
-                      <span style={{ color: "#64748b", fontSize: "12px", marginLeft: "10px" }}>
+                      <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
+                      <span style={{ color: "var(--c-text-3)", fontSize: "12px", marginLeft: "10px" }}>
                         {m.project?.name}
                       </span>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       {isAlert && (
-                        <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "2px 8px", borderRadius: "20px" }}>
+                        <span style={{ fontSize: "11px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 8px", borderRadius: "20px" }}>
                           ⚠ {daysUntil}d remaining
                         </span>
                       )}
-                      <span style={{ color: "#94a3b8", fontSize: "13px" }}>
+                      <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>
                         {new Date(m.date + "T00:00:00").toLocaleDateString()}
                       </span>
                     </div>
@@ -204,7 +204,7 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
         )}
 
         {/* Per-project breakdown */}
-        <h2 style={{ color: "#f1f5f9", fontSize: "16px", fontWeight: "600", marginBottom: "16px" }}>
+        <h2 style={{ color: "var(--c-text)", fontSize: "16px", fontWeight: "600", marginBottom: "16px" }}>
           Per-Project Category Breakdown
         </h2>
         <div style={{ display: "grid", gap: "16px" }}>
@@ -216,26 +216,26 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
             const catSt = categoryStats[p.id] || {};
 
             return (
-              <div key={p.id} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", overflow: "hidden" }}>
+              <div key={p.id} style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", overflow: "hidden" }}>
                 <div
                   onClick={() => setExpanded(isExpanded ? null : p.id)}
                   style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                   <div>
-                    <h3 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: "16px" }}>{p.name}</h3>
-                    <p style={{ color: "#94a3b8", margin: 0, fontSize: "12px" }}>
+                    <h3 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: "16px" }}>{p.name}</h3>
+                    <p style={{ color: "var(--c-text-2)", margin: 0, fontSize: "12px" }}>
                       {s.complete || 0} complete · {s.na || 0} N/A · {s.pending || 0} pending
                     </p>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-                    <span style={{ color: pct === 100 ? "#7ecb7b" : "#f1f5f9", fontSize: "24px", fontWeight: "700" }}>
+                    <span style={{ color: pct === 100 ? "var(--c-ok-text)" : "var(--c-text)", fontSize: "24px", fontWeight: "700" }}>
                       {pct}%
                     </span>
-                    <span style={{ color: "#64748b", fontSize: "12px" }}>{isExpanded ? "▲" : "▼"}</span>
+                    <span style={{ color: "var(--c-text-3)", fontSize: "12px" }}>{isExpanded ? "▲" : "▼"}</span>
                   </div>
                 </div>
 
-                <div style={{ height: "4px", background: "#0f172a", margin: "0 20px 16px" }}>
-                  <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4da447" : "#0095da", borderRadius: "2px", transition: "width 0.3s" }} />
+                <div style={{ height: "4px", background: "var(--c-bg)", margin: "0 20px 16px" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "var(--c-ok)" : "var(--c-accent)", borderRadius: "2px", transition: "width 0.3s" }} />
                 </div>
 
                 {isExpanded && (
@@ -247,13 +247,13 @@ export default function DashboardView({ session, onBack, onSignOut, onGoToProjec
                         return (
                           <div key={cat.id}>
                             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                              <span style={{ color: "#94a3b8", fontSize: "13px" }}>{cat.label}</span>
-                              <span style={{ color: catPct === 100 ? "#7ecb7b" : "#94a3b8", fontSize: "12px", fontWeight: "600" }}>
+                              <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>{cat.label}</span>
+                              <span style={{ color: catPct === 100 ? "var(--c-ok-text)" : "var(--c-text-2)", fontSize: "12px", fontWeight: "600" }}>
                                 {catPct}% ({cs.done}/{cs.total})
                               </span>
                             </div>
-                            <div style={{ height: "4px", background: "#0f172a", borderRadius: "2px" }}>
-                              <div style={{ height: "100%", width: `${catPct}%`, background: catPct === 100 ? "#4da447" : "#0095da", borderRadius: "2px" }} />
+                            <div style={{ height: "4px", background: "var(--c-bg)", borderRadius: "2px" }}>
+                              <div style={{ height: "100%", width: `${catPct}%`, background: catPct === 100 ? "var(--c-ok)" : "var(--c-accent)", borderRadius: "2px" }} />
                             </div>
                           </div>
                         );

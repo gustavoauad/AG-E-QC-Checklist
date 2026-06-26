@@ -5,7 +5,7 @@ import CreateProjectModal from "./CreateProjectModal";
 import ProjectSetupModal from "./ProjectSetupModal";
 
 const roleColors = {
-  project_manager: { bg: "#012d5a", color: "#33bdef", label: "Project Manager" },
+  project_manager: { bg: "var(--c-accent-dk)", color: "var(--c-accent-lt)", label: "Project Manager" },
   engineer:        { bg: "#1a3a2a", color: "#4ade80", label: "Engineer" },
   drafter:         { bg: "#3a1a3a", color: "#c084fc", label: "Drafter" },
 };
@@ -103,14 +103,14 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
       {/* Header row */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", gap: "12px" }}>
         <div>
-          <h2 style={{ color: "#f1f5f9", margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>Projects</h2>
-          <p style={{ color: "#94a3b8", margin: "4px 0 0", fontSize: "13px" }}>
+          <h2 style={{ color: "var(--c-text)", margin: 0, fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>Projects</h2>
+          <p style={{ color: "var(--c-text-2)", margin: "4px 0 0", fontSize: "13px" }}>
             {activeList.length} project{activeList.length !== 1 ? "s" : ""}
           </p>
         </div>
         {orgRole === "admin" && (
           <button onClick={() => setShowCreate(true)} style={{
-            padding: isMobile ? "8px 14px" : "10px 20px", background: "#0095da", color: "white",
+            padding: isMobile ? "8px 14px" : "10px 20px", background: "var(--c-accent)", color: "white",
             border: "none", borderRadius: "8px", fontSize: isMobile ? "13px" : "14px",
             fontWeight: "600", cursor: "pointer", flexShrink: 0, fontFamily: "Manrope, sans-serif",
           }}>
@@ -121,11 +121,11 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
 
       {/* Active projects */}
       {loading ? (
-        <p style={{ color: "#94a3b8", textAlign: "center", padding: "40px 0" }}>Loading projects...</p>
+        <p style={{ color: "var(--c-text-2)", textAlign: "center", padding: "40px 0" }}>Loading projects...</p>
       ) : activeList.length === 0 ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
-          <p style={{ color: "#94a3b8", fontSize: "16px" }}>No projects yet.</p>
-          <p style={{ color: "#64748b", fontSize: "13px" }}>
+          <p style={{ color: "var(--c-text-2)", fontSize: "16px" }}>No projects yet.</p>
+          <p style={{ color: "var(--c-text-3)", fontSize: "13px" }}>
             {orgRole === "admin" ? "Create a new project to get started." : "You haven't been assigned to any projects yet."}
           </p>
         </div>
@@ -136,22 +136,22 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
               key={project.id}
               onClick={() => role && onSelectProject(project, role)}
               style={{
-                background: "#1e293b", border: "1px solid #334155", borderRadius: "12px",
+                background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px",
                 padding: isMobile ? "16px" : "20px",
                 cursor: role ? "pointer" : "default",
                 opacity: role ? 1 : 0.6,
               }}
-              onMouseEnter={(e) => role && (e.currentTarget.style.borderColor = "#0095da")}
-              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#334155")}>
+              onMouseEnter={(e) => role && (e.currentTarget.style.borderColor = "var(--c-accent)")}
+              onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--c-border)")}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <h3 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: isMobile ? "15px" : "17px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <h3 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: isMobile ? "15px" : "17px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {project.name}
                   </h3>
                   {project.description && (
-                    <p style={{ color: "#94a3b8", margin: "0 0 6px", fontSize: "13px" }}>{project.description}</p>
+                    <p style={{ color: "var(--c-text-2)", margin: "0 0 6px", fontSize: "13px" }}>{project.description}</p>
                   )}
-                  <p style={{ color: "#64748b", margin: 0, fontSize: "11px" }}>
+                  <p style={{ color: "var(--c-text-3)", margin: 0, fontSize: "11px" }}>
                     Created {new Date(project.created_at).toLocaleDateString()}
                   </p>
                 </div>
@@ -164,7 +164,7 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
                       {isMobile ? (role === "project_manager" ? "PM" : role.charAt(0).toUpperCase() + role.slice(1)) : roleColors[role]?.label}
                     </span>
                   ) : (
-                    <span style={{ padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "#1e293b", color: "#64748b", border: "1px solid #334155" }}>
+                    <span style={{ padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--c-surface)", color: "var(--c-text-3)", border: "1px solid #334155" }}>
                       Not assigned
                     </span>
                   )}
@@ -172,19 +172,19 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
                         onClick={(e) => { e.stopPropagation(); setSetupProject({ project, role: role || "project_manager" }); }}
-                        style={{ padding: "5px 10px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                        style={{ padding: "5px 10px", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
                         ⚙ Setup
                       </button>
                       <button
                         onClick={(e) => handleArchive(e, project.id)}
                         disabled={archivingId === project.id}
-                        style={{ padding: "5px 10px", background: "transparent", color: "#f59e0b", border: "1px solid #f59e0b", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
+                        style={{ padding: "5px 10px", background: "transparent", color: "var(--c-warn)", border: "1px solid #f59e0b", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
                         {archivingId === project.id ? "..." : "Archive"}
                       </button>
                       <button
                         onClick={(e) => handleDelete(e, project.id)}
                         disabled={deletingId === project.id}
-                        style={{ padding: "5px 10px", background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
+                        style={{ padding: "5px 10px", background: "transparent", color: "var(--c-err)", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
                         {deletingId === project.id ? "..." : "✕"}
                       </button>
                     </div>
@@ -203,7 +203,7 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
             onClick={() => setShowArchived((v) => !v)}
             style={{
               display: "flex", alignItems: "center", gap: "8px", background: "none",
-              border: "none", color: "#64748b", cursor: "pointer", fontSize: "13px",
+              border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "13px",
               fontWeight: "600", padding: "0", marginBottom: showArchived ? "16px" : "0",
               fontFamily: "Manrope, sans-serif",
             }}>
@@ -219,7 +219,7 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
                   padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap",
                 }}>
                   <div>
-                    <span style={{ color: "#64748b", fontSize: "14px", fontWeight: "600" }}>{project.name}</span>
+                    <span style={{ color: "var(--c-text-3)", fontSize: "14px", fontWeight: "600" }}>{project.name}</span>
                     <span style={{ color: "#4a5568", fontSize: "11px", marginLeft: "10px" }}>
                       Archived {new Date(project.archived_at).toLocaleDateString()}
                     </span>
@@ -228,13 +228,13 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
                     <div style={{ display: "flex", gap: "6px" }}>
                       <button
                         onClick={() => handleUnarchive(project.id)}
-                        style={{ padding: "5px 12px", background: "transparent", color: "#33bdef", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
+                        style={{ padding: "5px 12px", background: "transparent", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
                         Unarchive
                       </button>
                       <button
                         onClick={(e) => handleDelete(e, project.id)}
                         disabled={deletingId === project.id}
-                        style={{ padding: "5px 10px", background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
+                        style={{ padding: "5px 10px", background: "transparent", color: "var(--c-err)", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>
                         {deletingId === project.id ? "..." : "✕"}
                       </button>
                     </div>

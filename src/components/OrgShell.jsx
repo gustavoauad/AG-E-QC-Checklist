@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useIsMobile } from "../useIsMobile";
+import { useTheme } from "../ThemeContext";
 import AgeLogo from "./AgeLogo";
 import NotificationBell from "./NotificationBell";
 import OrgDashboard from "./OrgDashboard";
@@ -9,6 +10,7 @@ import ChecklistView from "./ChecklistView";
 
 export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut, onSwitchOrg }) {
   const isMobile = useIsMobile();
+  const { theme, toggleTheme } = useTheme();
   const [section, setSection] = useState("projects");
   const [selectedProject, setSelectedProject] = useState(null);
   const [userRole, setUserRole] = useState(null);
@@ -35,19 +37,19 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#0f172a", fontFamily: "Manrope, sans-serif" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--c-bg)", fontFamily: "Manrope, sans-serif" }}>
 
       {/* Header */}
       <div style={{
-        background: "#1e293b", borderBottom: "1px solid #334155",
+        background: "var(--c-surface)", borderBottom: "1px solid #334155",
         padding: isMobile ? "10px 16px" : "12px 24px",
         display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
           <AgeLogo height={isMobile ? 20 : 24} />
           <div style={{ borderLeft: "1px solid #334155", paddingLeft: "12px" }}>
-            <div style={{ color: "#f1f5f9", fontSize: isMobile ? "13px" : "14px", fontWeight: "700", lineHeight: 1.2 }}>{org.name}</div>
-            <div style={{ color: orgRole === "admin" ? "#33bdef" : "#7ecb7b", fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            <div style={{ color: "var(--c-text)", fontSize: isMobile ? "13px" : "14px", fontWeight: "700", lineHeight: 1.2 }}>{org.name}</div>
+            <div style={{ color: orgRole === "admin" ? "var(--c-accent-lt)" : "var(--c-ok-text)", fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>
               {orgRole}
             </div>
           </div>
@@ -56,14 +58,21 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
           {!isMobile && (
             <button onClick={onSwitchOrg} style={{
               padding: "6px 12px", background: "transparent", border: "1px solid #334155",
-              color: "#94a3b8", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontFamily: "Manrope, sans-serif",
+              color: "var(--c-text-2)", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontFamily: "Manrope, sans-serif",
             }}>
               Switch Org
             </button>
           )}
           <NotificationBell userId={session.user.id} onGoToProjects={() => setSection("projects")} />
+          <button onClick={toggleTheme} title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"} style={{
+            padding: "6px 10px", background: "transparent", border: "1px solid var(--c-border)",
+            color: "var(--c-text-2)", borderRadius: "6px", cursor: "pointer", fontSize: "15px",
+            lineHeight: 1, fontFamily: "Manrope, sans-serif",
+          }}>
+            {theme === "dark" ? "☀" : "🌙"}
+          </button>
           <button onClick={onSignOut} style={{
-            padding: isMobile ? "6px 10px" : "7px 14px", background: "#ef4444", color: "white",
+            padding: isMobile ? "6px 10px" : "7px 14px", background: "var(--c-err)", color: "white",
             border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontFamily: "Manrope, sans-serif",
           }}>
             {isMobile ? "↩" : "Sign Out"}
@@ -78,7 +87,7 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
         {!isMobile && (
           <div style={{
             width: sidebarOpen ? "200px" : "52px",
-            background: "#1e293b", borderRight: "1px solid #334155",
+            background: "var(--c-surface)", borderRight: "1px solid #334155",
             padding: sidebarOpen ? "20px 12px" : "20px 8px",
             display: "flex", flexDirection: "column", gap: "4px", flexShrink: 0,
             transition: "width 0.2s ease",
@@ -88,7 +97,7 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
             <button onClick={() => setSidebarOpen((v) => !v)} title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"} style={{
               display: "flex", alignItems: "center", justifyContent: sidebarOpen ? "flex-end" : "center",
               padding: "6px", border: "none", borderRadius: "6px",
-              background: "transparent", color: "#64748b",
+              background: "transparent", color: "var(--c-text-3)",
               cursor: "pointer", marginBottom: "8px", flexShrink: 0,
             }}>
               <span style={{ fontSize: "14px" }}>{sidebarOpen ? "◀" : "▶"}</span>
@@ -99,8 +108,8 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
                 display: "flex", alignItems: "center", gap: sidebarOpen ? "10px" : "0",
                 justifyContent: sidebarOpen ? "flex-start" : "center",
                 padding: "10px 12px", border: "none", borderRadius: "8px",
-                background: section === id ? "#0095da" : "transparent",
-                color: section === id ? "white" : "#94a3b8",
+                background: section === id ? "var(--c-accent)" : "transparent",
+                color: section === id ? "white" : "var(--c-text-2)",
                 cursor: "pointer", fontSize: "14px", fontWeight: section === id ? "600" : "400",
                 textAlign: "left", width: "100%", fontFamily: "Manrope, sans-serif",
                 whiteSpace: "nowrap",
@@ -116,7 +125,7 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
                 display: "flex", alignItems: "center", gap: sidebarOpen ? "10px" : "0",
                 justifyContent: sidebarOpen ? "flex-start" : "center",
                 padding: "8px 12px", border: "none", borderRadius: "8px",
-                background: "transparent", color: "#64748b",
+                background: "transparent", color: "var(--c-text-3)",
                 cursor: "pointer", fontSize: "13px", width: "100%", fontFamily: "Manrope, sans-serif",
               }}>
                 <span style={{ flexShrink: 0 }}>↩</span>
@@ -152,12 +161,12 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
 
       {/* Bottom nav (mobile only) */}
       {isMobile && (
-        <div style={{ display: "flex", background: "#1e293b", borderTop: "1px solid #334155", flexShrink: 0 }}>
+        <div style={{ display: "flex", background: "var(--c-surface)", borderTop: "1px solid #334155", flexShrink: 0 }}>
           {nav.map(({ id, icon, label }) => (
             <button key={id} onClick={() => setSection(id)} style={{
               flex: 1, padding: "10px 4px 8px", border: "none",
-              background: section === id ? "#012d5a" : "transparent",
-              color: section === id ? "#0095da" : "#64748b",
+              background: section === id ? "var(--c-accent-dk)" : "transparent",
+              color: section === id ? "var(--c-accent)" : "var(--c-text-3)",
               cursor: "pointer", fontSize: "11px", fontWeight: section === id ? "700" : "400",
               display: "flex", flexDirection: "column", alignItems: "center", gap: "2px",
               fontFamily: "Manrope, sans-serif",

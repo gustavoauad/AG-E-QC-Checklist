@@ -83,7 +83,7 @@ export default function App() {
   };
 
   if (loading) return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", display: "flex", alignItems: "center", justifyContent: "center", color: "#94a3b8", fontFamily: "Manrope, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: "var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--c-text-2)", fontFamily: "Manrope, sans-serif" }}>
       Loading...
     </div>
   );
@@ -91,9 +91,9 @@ export default function App() {
   if (!session) return <AuthScreen />;
 
   const toastColors = {
-    success: { bg: "#1a3318", border: "#4da447", color: "#7ecb7b" },
-    error:   { bg: "#450a0a", border: "#ef4444", color: "#fca5a5" },
-    info:    { bg: "#011a3d", border: "#0095da", color: "#33bdef" },
+    success: { bg: "var(--c-ok-bg)", border: "var(--c-ok)", color: "var(--c-ok-text)" },
+    error:   { bg: "var(--c-err-bg)", border: "var(--c-err)", color: "var(--c-err-text)" },
+    info:    { bg: "var(--c-accent-dk)", border: "var(--c-accent)", color: "var(--c-accent-lt)" },
   };
 
   return (

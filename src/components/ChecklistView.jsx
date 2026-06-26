@@ -232,9 +232,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const overallProgress = totalItems ? Math.round(((completedItems + naItems) / totalItems) * 100) : 0;
 
   const statusColors = {
-    complete: { bg: "#1a3318", border: "#4da447", color: "#7ecb7b", label: isMobile ? "✓" : "Complete" },
-    na:       { bg: "#1c1917", border: "#78716c", color: "#a8a29e", label: "N/A" },
-    pending:  { bg: "#0c1a2e", border: "#334155", color: "#94a3b8", label: isMobile ? "—" : "Pending" },
+    complete: { bg: "var(--c-ok-bg)", border: "var(--c-ok)", color: "var(--c-ok-text)", label: isMobile ? "✓" : "Complete" },
+    na:       { bg: "var(--c-neutral-bg)", border: "var(--c-neutral)", color: "var(--c-neutral-text)", label: "N/A" },
+    pending:  { bg: "var(--c-surface-alt)", border: "var(--c-border)", color: "var(--c-text-2)", label: isMobile ? "—" : "Pending" },
   };
 
   const formatDate = (iso) => iso
@@ -282,14 +282,14 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     return (
       <div key={item.id} style={{
         borderBottom: idx < totalInGroup - 1 ? "1px solid #1e293b" : "none",
-        background: "#0f172a",
+        background: "var(--c-bg)",
       }}>
         <div style={{ padding: isMobile ? "10px 12px" : "12px 16px" }}>
 
           {/* Row 1: ID · current status badge · spacer · status buttons · comment */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px", flexWrap: "wrap" }}>
             {refCodes[item.id] && (
-              <span style={{ fontSize: "10px", fontWeight: "700", color: "#334155", fontFamily: "monospace", letterSpacing: "0.05em", background: "#1e293b", border: "1px solid #243044", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>
+              <span style={{ fontSize: "10px", fontWeight: "700", color: "var(--c-border)", fontFamily: "monospace", letterSpacing: "0.05em", background: "var(--c-surface)", border: "1px solid #243044", borderRadius: "4px", padding: "2px 6px", flexShrink: 0 }}>
                 {refCodes[item.id]}
               </span>
             )}
@@ -297,8 +297,8 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             <span style={{ fontSize: "10px", fontWeight: "700", color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: "20px", padding: "2px 10px", flexShrink: 0 }}>
               {status === "complete" ? "Complete" : status === "na" ? "N/A" : "Pending"}
             </span>
-            {item.is_custom && <span style={{ fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "2px 7px", borderRadius: "20px" }}>custom</span>}
-            {item.edited_by_pm && <span style={{ fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "2px 7px", borderRadius: "20px" }}>✏ edited</span>}
+            {item.is_custom && <span style={{ fontSize: "10px", color: "var(--c-purple)", background: "var(--c-purple-bg)", padding: "2px 7px", borderRadius: "20px" }}>custom</span>}
+            {item.edited_by_pm && <span style={{ fontSize: "10px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 7px", borderRadius: "20px" }}>✏ edited</span>}
 
             {/* Push status buttons and comment to the right */}
             <div style={{ flex: 1 }} />
@@ -316,10 +316,10 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                       title={s === "complete" ? "Mark Complete" : s === "na" ? "Mark N/A" : "Mark Pending"}
                       style={{
                         padding: isMobile ? "4px 8px" : "4px 12px",
-                        border: `1px solid ${isActive ? btn.border : "#334155"}`,
+                        border: `1px solid ${isActive ? btn.border : "var(--c-border)"}`,
                         borderRadius: "6px", fontSize: "11px", fontWeight: "600",
                         background: isActive ? btn.bg : "transparent",
-                        color: isActive ? btn.color : "#475569",
+                        color: isActive ? btn.color : "var(--c-text-4)",
                         cursor: isUpdating ? "not-allowed" : "pointer",
                         transition: "all 0.1s",
                       }}>
@@ -330,15 +330,15 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               </div>
             )}
             {!editable && (
-              <span style={{ fontSize: "11px", color: "#475569", fontStyle: "italic", flexShrink: 0 }}>view only</span>
+              <span style={{ fontSize: "11px", color: "var(--c-text-4)", fontStyle: "italic", flexShrink: 0 }}>view only</span>
             )}
 
             {/* Comment button */}
             <button onClick={() => toggleComments(item.id)} style={{
               flexShrink: 0,
-              background: isCommentsOpen ? "#012d5a" : "transparent",
-              border: `1px solid ${isCommentsOpen ? "#0095da" : "#334155"}`,
-              color: isCommentsOpen ? "#33bdef" : "#64748b",
+              background: isCommentsOpen ? "var(--c-accent-dk)" : "transparent",
+              border: `1px solid ${isCommentsOpen ? "var(--c-accent)" : "var(--c-border)"}`,
+              color: isCommentsOpen ? "var(--c-accent-lt)" : "var(--c-text-3)",
               borderRadius: "6px", padding: "4px 10px",
               fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap",
             }}>
@@ -349,7 +349,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           {/* Row 2: Item description */}
           <p style={{
             margin: "0 0 8px", fontSize: isMobile ? "13px" : "14px", lineHeight: "1.6",
-            color: status === "na" ? "#475569" : "#e2e8f0",
+            color: status === "na" ? "var(--c-text-4)" : "var(--c-text)",
             textDecoration: status === "na" ? "line-through" : "none",
           }}>
             {item.item_text}
@@ -358,18 +358,18 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           {/* Row 3: Completed by + milestones */}
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
             {status === "complete" && completedByName && (
-              <span style={{ fontSize: "11px", color: "#7ecb7b", flexShrink: 0 }}>
+              <span style={{ fontSize: "11px", color: "var(--c-ok-text)", flexShrink: 0 }}>
                 ✓ {completedByName} · {formatDate(item.completed_at)}
               </span>
             )}
             {milestones.length > 0 && (
               <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "4px" }}>
-                <span style={{ fontSize: "10px", color: "#475569", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>Milestones:</span>
+                <span style={{ fontSize: "10px", color: "var(--c-text-4)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", flexShrink: 0 }}>Milestones:</span>
                 {msList.length > 0
                   ? msList.map((name) => (
-                      <span key={name} style={{ fontSize: "10px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "3px", padding: "2px 7px" }}>{name}</span>
+                      <span key={name} style={{ fontSize: "10px", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "3px", padding: "2px 7px" }}>{name}</span>
                     ))
-                  : <span style={{ fontSize: "10px", color: "#ef4444", background: "#2d0a0a", border: "1px solid #7f1d1d", borderRadius: "3px", padding: "2px 7px" }}>⚠ not assigned</span>
+                  : <span style={{ fontSize: "10px", color: "var(--c-err)", background: "var(--c-err-bg)", border: "1px solid #7f1d1d", borderRadius: "3px", padding: "2px 7px" }}>⚠ not assigned</span>
                 }
               </div>
             )}
@@ -378,28 +378,28 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
         {/* Comments panel */}
         {isCommentsOpen && (
-          <div style={{ borderTop: "1px solid #1e293b", padding: "12px 16px 14px", background: "#060d1a" }}>
+          <div style={{ borderTop: "1px solid #1e293b", padding: "12px 16px 14px", background: "var(--c-surface-deep)" }}>
             {comments.length === 0 ? (
-              <p style={{ color: "#64748b", fontSize: "13px", margin: "0 0 10px" }}>No comments yet.</p>
+              <p style={{ color: "var(--c-text-3)", fontSize: "13px", margin: "0 0 10px" }}>No comments yet.</p>
             ) : (
               <div style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
                 {comments.map((c) => (
-                  <div key={c.id} style={{ background: "#1e293b", borderRadius: "8px", padding: "10px 12px" }}>
+                  <div key={c.id} style={{ background: "var(--c-surface)", borderRadius: "8px", padding: "10px 12px" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "12px", color: "#33bdef", fontWeight: "600" }}>
+                      <span style={{ fontSize: "12px", color: "var(--c-accent-lt)", fontWeight: "600" }}>
                         {profilesMap[c.user_id]?.full_name || "Unknown"}
                       </span>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ fontSize: "11px", color: "#64748b" }}>{formatDate(c.created_at)}</span>
+                        <span style={{ fontSize: "11px", color: "var(--c-text-3)" }}>{formatDate(c.created_at)}</span>
                         {c.user_id === session.user.id && (
                           <button onClick={() => deleteComment(item.id, c.id)}
-                            style={{ background: "none", border: "none", color: "#64748b", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: 0 }}
-                            onMouseEnter={(e) => e.currentTarget.style.color = "#ef4444"}
-                            onMouseLeave={(e) => e.currentTarget.style.color = "#64748b"}>×</button>
+                            style={{ background: "none", border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "16px", lineHeight: 1, padding: 0 }}
+                            onMouseEnter={(e) => e.currentTarget.style.color = "var(--c-err)"}
+                            onMouseLeave={(e) => e.currentTarget.style.color = "var(--c-text-3)"}>×</button>
                         )}
                       </div>
                     </div>
-                    <p style={{ color: "#f1f5f9", fontSize: "13px", margin: 0, lineHeight: "1.5" }}>{c.comment}</p>
+                    <p style={{ color: "var(--c-text)", fontSize: "13px", margin: 0, lineHeight: "1.5" }}>{c.comment}</p>
                   </div>
                 ))}
               </div>
@@ -408,10 +408,10 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               <input value={commentText} onChange={(e) => setCommentText(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submitComment(item.id)}
                 placeholder="Add a comment… (Enter to send)"
-                style={{ flex: 1, padding: "8px 12px", background: "#1e293b", border: "1px solid #334155", borderRadius: "6px", color: "#f1f5f9", fontSize: "13px" }}
+                style={{ flex: 1, padding: "8px 12px", background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "6px", color: "var(--c-text)", fontSize: "13px" }}
               />
               <button onClick={() => submitComment(item.id)} disabled={addingComment || !commentText.trim()}
-                style={{ padding: "8px 14px", background: "#0095da", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                style={{ padding: "8px 14px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
                 Send
               </button>
             </div>
@@ -429,19 +429,19 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     return (
       <div key={subSection} style={{ marginBottom: "16px" }}>
         {!isGeneral && (
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#0c1a2e", borderLeft: "3px solid #0095da", padding: "8px 16px", marginBottom: "2px", borderRadius: "0 8px 0 0" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "var(--c-surface-alt)", borderLeft: "3px solid #0095da", padding: "8px 16px", marginBottom: "2px", borderRadius: "0 8px 0 0" }}>
             {sectionRef && (
-              <span style={{ fontSize: "10px", fontWeight: "700", color: "#0095da", fontFamily: "monospace", letterSpacing: "0.05em", background: "#012d5a", border: "1px solid #0095da", borderRadius: "4px", padding: "2px 7px", flexShrink: 0 }}>
+              <span style={{ fontSize: "10px", fontWeight: "700", color: "var(--c-accent)", fontFamily: "monospace", letterSpacing: "0.05em", background: "var(--c-accent-dk)", border: "1px solid #0095da", borderRadius: "4px", padding: "2px 7px", flexShrink: 0 }}>
                 {sectionRef}
               </span>
             )}
-            <span style={{ flex: 1, textAlign: "center", color: "#f1f5f9", fontSize: isMobile ? "12px" : "13px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+            <span style={{ flex: 1, textAlign: "center", color: "var(--c-text)", fontSize: isMobile ? "12px" : "13px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.08em" }}>
               {subSection}
             </span>
-            <span style={{ fontSize: "10px", color: "#475569", flexShrink: 0 }}>{items.length} items</span>
+            <span style={{ fontSize: "10px", color: "var(--c-text-4)", flexShrink: 0 }}>{items.length} items</span>
           </div>
         )}
-        <div style={{ borderRadius: isGeneral ? "10px" : "0 0 10px 10px", border: "1px solid #1e293b", borderTop: isGeneral ? undefined : "none", overflow: "hidden", display: "grid", gap: "1px", background: "#1e293b" }}>
+        <div style={{ borderRadius: isGeneral ? "10px" : "0 0 10px 10px", border: "1px solid #1e293b", borderTop: isGeneral ? undefined : "none", overflow: "hidden", display: "grid", gap: "1px", background: "var(--c-surface)" }}>
           {items.map((item, idx) => renderItem(item, idx, items.length))}
         </div>
       </div>
@@ -467,12 +467,12 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
         }));
 
     return (
-      <div style={{ overflowX: "auto", display: "flex", gap: "8px", padding: "10px 16px", background: "#1e293b", borderBottom: "1px solid #334155" }}>
+      <div style={{ overflowX: "auto", display: "flex", gap: "8px", padding: "10px 16px", background: "var(--c-surface)", borderBottom: "1px solid #334155" }}>
         {items.map((item) => (
           <button key={item.id} onClick={item.onClick} style={{
             flexShrink: 0, padding: "6px 12px", border: "none", borderRadius: "20px",
-            background: item.active ? "#0095da" : "#0f172a",
-            color: item.active ? "white" : "#94a3b8",
+            background: item.active ? "var(--c-accent)" : "var(--c-bg)",
+            color: item.active ? "white" : "var(--c-text-2)",
             fontSize: "12px", fontWeight: item.active ? "600" : "400", cursor: "pointer",
             whiteSpace: "nowrap",
           }}>
@@ -484,35 +484,35 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   };
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f172a", fontFamily: "Manrope, sans-serif", display: "flex", flexDirection: "column" }}>
+    <div style={{ minHeight: "100vh", background: "var(--c-bg)", fontFamily: "Manrope, sans-serif", display: "flex", flexDirection: "column" }}>
 
       {/* Header */}
-      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: isMobile ? "12px 16px" : "16px 24px" }}>
+      <div style={{ background: "var(--c-surface)", borderBottom: "1px solid #334155", padding: isMobile ? "12px 16px" : "16px 24px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
-            <button onClick={onBack} style={{ background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "13px", flexShrink: 0 }}>
+            <button onClick={onBack} style={{ background: "var(--c-border)", color: "var(--c-text)", border: "none", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize: "13px", flexShrink: 0 }}>
               ←
             </button>
             <div style={{ minWidth: 0 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 {!isMobile && <AgeLogo height={18} />}
-                <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "16px", fontWeight: "700", color: "#f1f5f9", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                <h1 style={{ margin: 0, fontSize: isMobile ? "15px" : "16px", fontWeight: "700", color: "var(--c-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {project.name}
                 </h1>
               </div>
-              <p style={{ margin: 0, fontSize: "11px", color: "#94a3b8" }}>
+              <p style={{ margin: 0, fontSize: "11px", color: "var(--c-text-2)" }}>
                 {completedItems} done · {naItems} N/A · {pendingItems} pending · {overallProgress}%
               </p>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             {!isMobile && (
-              <span style={{ fontSize: "12px", color: "#94a3b8" }}>
-                Role: <strong style={{ color: "#f1f5f9" }}>{userRole.replace("_", " ")}</strong>
+              <span style={{ fontSize: "12px", color: "var(--c-text-2)" }}>
+                Role: <strong style={{ color: "var(--c-text)" }}>{userRole.replace("_", " ")}</strong>
               </span>
             )}
             <NotificationBell userId={session.user.id} onGoToProjects={onGoToProjects} />
-            <button onClick={onSignOut} style={{ padding: "6px 12px", background: "#ef4444", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
+            <button onClick={onSignOut} style={{ padding: "6px 12px", background: "var(--c-err)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
               {isMobile ? "↩" : "Sign Out"}
             </button>
           </div>
@@ -520,13 +520,13 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
       </div>
 
       {/* View mode toggle */}
-      <div style={{ background: "#1e293b", borderBottom: "1px solid #334155", padding: "0 16px", display: "flex" }}>
+      <div style={{ background: "var(--c-surface)", borderBottom: "1px solid #334155", padding: "0 16px", display: "flex" }}>
         {[{ id: "category", label: "By Category" }, { id: "milestone", label: "By Milestone" }].map(({ id, label }) => (
           <button key={id} onClick={() => handleViewModeToggle(id)} style={{
             padding: "10px 16px", border: "none", background: "transparent", cursor: "pointer",
             fontSize: "13px", fontWeight: viewMode === id ? "600" : "400",
-            color: viewMode === id ? "#0095da" : "#64748b",
-            borderBottom: `2px solid ${viewMode === id ? "#0095da" : "transparent"}`,
+            color: viewMode === id ? "var(--c-accent)" : "var(--c-text-3)",
+            borderBottom: `2px solid ${viewMode === id ? "var(--c-accent)" : "transparent"}`,
           }}>
             {label}
           </button>
@@ -534,40 +534,40 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
       </div>
 
       {/* Filter bar */}
-      <div style={{ background: "#0f172a", borderBottom: "1px solid #243044", padding: isMobile ? "8px 12px" : "8px 20px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Filter:</span>
+      <div style={{ background: "var(--c-bg)", borderBottom: "1px solid #243044", padding: isMobile ? "8px 12px" : "8px 20px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: "11px", color: "var(--c-text-3)", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Filter:</span>
 
         {/* Milestone filter */}
         {milestones.length > 0 && (<>
           <button onClick={() => setFilterMilestone("all")} style={{
             padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
             fontSize: "12px", fontWeight: "600", cursor: "pointer",
-            background: filterMilestoneId === "all" ? "#012d5a" : "transparent",
-            borderColor: filterMilestoneId === "all" ? "#0095da" : "#334155",
-            color: filterMilestoneId === "all" ? "#33bdef" : "#64748b",
+            background: filterMilestoneId === "all" ? "var(--c-accent-dk)" : "transparent",
+            borderColor: filterMilestoneId === "all" ? "var(--c-accent)" : "var(--c-border)",
+            color: filterMilestoneId === "all" ? "var(--c-accent-lt)" : "var(--c-text-3)",
           }}>All Milestones</button>
           {milestones.map((m) => (
             <button key={m.id} onClick={() => setFilterMilestone(m.id)} style={{
               padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
               fontSize: "12px", fontWeight: "600", cursor: "pointer",
-              background: filterMilestoneId === m.id ? "#012d5a" : "transparent",
-              borderColor: filterMilestoneId === m.id ? "#0095da" : "#334155",
-              color: filterMilestoneId === m.id ? "#33bdef" : "#64748b",
+              background: filterMilestoneId === m.id ? "var(--c-accent-dk)" : "transparent",
+              borderColor: filterMilestoneId === m.id ? "var(--c-accent)" : "var(--c-border)",
+              color: filterMilestoneId === m.id ? "var(--c-accent-lt)" : "var(--c-text-3)",
               maxWidth: isMobile ? "120px" : "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
             }}>{m.name}</button>
           ))}
-          <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+          <div style={{ width: "1px", height: "16px", background: "var(--c-border)", margin: "0 4px" }} />
         </>)}
 
         {/* Applicable filter */}
         <button onClick={() => setFilterApplicable((v) => !v)} style={{
           padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
           fontSize: "12px", fontWeight: "600", cursor: "pointer",
-          background: filterApplicable ? "#29439b" : "transparent",
-          borderColor: filterApplicable ? "#4da8da" : "#334155",
-          color: filterApplicable ? "#c7d7ff" : "#64748b",
+          background: filterApplicable ? "var(--c-accent-2)" : "transparent",
+          borderColor: filterApplicable ? "var(--c-accent-lt)" : "var(--c-border)",
+          color: filterApplicable ? "var(--c-accent-lt)" : "var(--c-text-3)",
         }}>Applicable</button>
-        <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+        <div style={{ width: "1px", height: "16px", background: "var(--c-border)", margin: "0 4px" }} />
 
         {/* Status filter */}
         {[
@@ -579,9 +579,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           <button key={id} onClick={() => setFilterStatus(id)} style={{
             padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
             fontSize: "12px", fontWeight: "600", cursor: "pointer",
-            background: filterStatus === id ? (id === "complete" ? "#1a3318" : id === "pending" ? "#0c1a2e" : id === "na" ? "#1c1917" : "#1e293b") : "transparent",
-            borderColor: filterStatus === id ? (id === "complete" ? "#4da447" : id === "pending" ? "#0095da" : id === "na" ? "#78716c" : "#334155") : "#334155",
-            color: filterStatus === id ? (id === "complete" ? "#7ecb7b" : id === "pending" ? "#33bdef" : id === "na" ? "#a8a29e" : "#f1f5f9") : "#64748b",
+            background: filterStatus === id ? (id === "complete" ? "var(--c-ok-bg)" : id === "pending" ? "var(--c-surface-alt)" : id === "na" ? "var(--c-neutral-bg)" : "var(--c-surface)") : "transparent",
+            borderColor: filterStatus === id ? (id === "complete" ? "var(--c-ok)" : id === "pending" ? "var(--c-accent)" : id === "na" ? "var(--c-neutral)" : "var(--c-border)") : "var(--c-border)",
+            color: filterStatus === id ? (id === "complete" ? "var(--c-ok-text)" : id === "pending" ? "var(--c-accent-lt)" : id === "na" ? "var(--c-neutral-text)" : "var(--c-text)") : "var(--c-text-3)",
           }}>
             {label}
           </button>
@@ -592,7 +592,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           <button onClick={() => { setFilterMilestoneId("all"); setFilterStatus("all"); setFilterApplicable(false); }} style={{
             padding: "4px 10px", borderRadius: "20px", border: "1px solid #ef4444",
             fontSize: "11px", fontWeight: "600", cursor: "pointer",
-            background: "transparent", color: "#ef4444", marginLeft: "4px",
+            background: "transparent", color: "var(--c-err)", marginLeft: "4px",
           }}>
             ✕ Clear
           </button>
@@ -607,7 +607,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
         {/* Sidebar (desktop only) */}
         {!isMobile && (
-          <div style={{ width: "220px", background: "#1e293b", borderRight: "1px solid #334155", overflowY: "auto", padding: "12px" }}>
+          <div style={{ width: "220px", background: "var(--c-surface)", borderRight: "1px solid #334155", overflowY: "auto", padding: "12px" }}>
             {viewMode === "category" ? (
               enabledCategories.map((cat) => {
                 const progress = getCategoryProgress(cat.id);
@@ -616,12 +616,12 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                   <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
                     width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
                     padding: "8px 10px", marginBottom: "4px", border: "none", borderRadius: "8px",
-                    background: isActive ? "#0095da" : "transparent",
-                    color: isActive ? "white" : canEdit(cat.id) ? "#f1f5f9" : "#64748b",
+                    background: isActive ? "var(--c-accent)" : "transparent",
+                    color: isActive ? "white" : canEdit(cat.id) ? "var(--c-text)" : "var(--c-text-3)",
                     cursor: "pointer", fontSize: "13px", textAlign: "left",
                   }}>
                     <span style={{ flex: 1 }}>{cat.label}</span>
-                    <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "#7ecb7b" : "#94a3b8" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "var(--c-ok-text)" : "var(--c-text-2)" }}>
                       {progress}%
                     </span>
                   </button>
@@ -629,7 +629,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               })
             ) : (
               milestones.length === 0 ? (
-                <p style={{ color: "#64748b", fontSize: "12px", padding: "8px" }}>No milestones set up.</p>
+                <p style={{ color: "var(--c-text-3)", fontSize: "12px", padding: "8px" }}>No milestones set up.</p>
               ) : (
                 milestones.map((m) => {
                   const isActive = activeMilestoneId === m.id;
@@ -639,20 +639,20 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                   return (
                     <button key={m.id} onClick={() => switchToMilestone(m.id)} style={{
                       width: "100%", padding: "10px", marginBottom: "6px", border: "none", borderRadius: "8px",
-                      background: isActive ? "#0095da" : "transparent",
-                      color: isActive ? "white" : "#f1f5f9", cursor: "pointer", textAlign: "left",
+                      background: isActive ? "var(--c-accent)" : "transparent",
+                      color: isActive ? "white" : "var(--c-text)", cursor: "pointer", textAlign: "left",
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
                         <span style={{ fontSize: "13px", fontWeight: "600" }}>{m.name}</span>
-                        <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "#7ecb7b" : "#94a3b8" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "var(--c-ok-text)" : "var(--c-text-2)" }}>
                           {milestoneItemsCache[m.id] ? `${progress}%` : ""}
                         </span>
                       </div>
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                        <span style={{ fontSize: "11px", color: isActive ? "rgba(255,255,255,0.7)" : "#64748b" }}>
+                        <span style={{ fontSize: "11px", color: isActive ? "rgba(255,255,255,0.7)" : "var(--c-text-3)" }}>
                           {new Date(m.date + "T00:00:00").toLocaleDateString()}
                         </span>
-                        {isAlert && !isActive && <span style={{ fontSize: "10px", color: "#f59e0b" }}>⚠</span>}
+                        {isAlert && !isActive && <span style={{ fontSize: "10px", color: "var(--c-warn)" }}>⚠</span>}
                       </div>
                     </button>
                   );
@@ -665,15 +665,15 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
         {/* Main content */}
         <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "24px" }}>
           {loading ? (
-            <p style={{ color: "#94a3b8" }}>Loading checklist...</p>
+            <p style={{ color: "var(--c-text-2)" }}>Loading checklist...</p>
           ) : viewMode === "category" ? (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
-                <h2 style={{ color: "#f1f5f9", margin: 0, fontSize: isMobile ? "16px" : "20px" }}>
+                <h2 style={{ color: "var(--c-text)", margin: 0, fontSize: isMobile ? "16px" : "20px" }}>
                   {getCatLabel(activeCategory)}
                 </h2>
                 {activeCategory && !canEdit(activeCategory) && (
-                  <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "4px 10px", borderRadius: "20px", border: "1px solid #f59e0b" }}>
+                  <span style={{ fontSize: "11px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "4px 10px", borderRadius: "20px", border: "1px solid #f59e0b" }}>
                     View only
                   </span>
                 )}
@@ -683,15 +683,15 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           ) : (
             milestones.length === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <p style={{ color: "#94a3b8", fontSize: "16px" }}>No milestones set up.</p>
-                <p style={{ color: "#64748b", fontSize: "14px" }}>Go to Project Setup → Milestones.</p>
+                <p style={{ color: "var(--c-text-2)", fontSize: "16px" }}>No milestones set up.</p>
+                <p style={{ color: "var(--c-text-3)", fontSize: "14px" }}>Go to Project Setup → Milestones.</p>
               </div>
             ) : milestoneLoading || activeMilestoneItemIds === null ? (
-              <p style={{ color: "#94a3b8" }}>Loading milestone items...</p>
+              <p style={{ color: "var(--c-text-2)" }}>Loading milestone items...</p>
             ) : activeMilestoneItemIds.size === 0 ? (
               <div style={{ textAlign: "center", padding: "60px 0" }}>
-                <p style={{ color: "#94a3b8", fontSize: "16px" }}>No items assigned to this milestone.</p>
-                <p style={{ color: "#64748b", fontSize: "14px" }}>Go to Project Setup → Milestones → Assign Items.</p>
+                <p style={{ color: "var(--c-text-2)", fontSize: "16px" }}>No items assigned to this milestone.</p>
+                <p style={{ color: "var(--c-text-3)", fontSize: "14px" }}>Go to Project Setup → Milestones → Assign Items.</p>
               </div>
             ) : (
               <>
@@ -703,13 +703,13 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                   return (
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", flexWrap: "wrap", gap: "8px" }}>
                       <div>
-                        <h2 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: isMobile ? "16px" : "20px" }}>{m?.name}</h2>
+                        <h2 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: isMobile ? "16px" : "20px" }}>{m?.name}</h2>
                         <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
-                          <span style={{ color: "#94a3b8", fontSize: "13px" }}>{m && new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
-                          {isAlert && <span style={{ fontSize: "12px", color: "#f59e0b", background: "#451a03", padding: "2px 10px", borderRadius: "20px" }}>⚠ {daysUntil}d remaining</span>}
+                          <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>{m && new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
+                          {isAlert && <span style={{ fontSize: "12px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 10px", borderRadius: "20px" }}>⚠ {daysUntil}d remaining</span>}
                         </div>
                       </div>
-                      <span style={{ color: pct === 100 ? "#7ecb7b" : "#f1f5f9", fontSize: "28px", fontWeight: "700" }}>{pct}%</span>
+                      <span style={{ color: pct === 100 ? "var(--c-ok-text)" : "var(--c-text)", fontSize: "28px", fontWeight: "700" }}>{pct}%</span>
                     </div>
                   );
                 })()}

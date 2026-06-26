@@ -4,11 +4,11 @@ import { CATEGORIES } from "../checklistTemplate";
 import { useIsMobile } from "../useIsMobile";
 
 const inputStyle = {
-  width: "100%", padding: "10px 12px", background: "#0f172a",
-  border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9",
+  width: "100%", padding: "10px 12px", background: "var(--c-bg)",
+  border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)",
   fontSize: "14px", boxSizing: "border-box",
 };
-const labelStyle = { display: "block", color: "#94a3b8", fontSize: "13px", marginBottom: "6px" };
+const labelStyle = { display: "block", color: "var(--c-text-2)", fontSize: "13px", marginBottom: "6px" };
 
 // ── Checklists tab ─────────────────────────────────────────────────────────
 function deriveSections(catItems) {
@@ -62,16 +62,8 @@ function ChecklistsTab({ project, userRole }) {
   const [milestones, setMilestones] = useState([]);
   // itemMilestones: itemId → Set<milestoneId>
   const [itemMilestones, setItemMilestones] = useState({});
-  // milestonePickerOpen: itemId | `sec:catId:label` | `cat:catId` | null
-  const [milestonePickerOpen, setMilestonePickerOpen] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
-  useEffect(() => {
-    if (!milestonePickerOpen) return;
-    const close = () => setMilestonePickerOpen(null);
-    document.addEventListener("click", close);
-    return () => document.removeEventListener("click", close);
-  }, [milestonePickerOpen]);
 
   const loadAll = async () => {
     setLoading(true);
@@ -117,7 +109,7 @@ function ChecklistsTab({ project, userRole }) {
     .map(([key, val]) => ({ id: key, label: val.label, isCustom: true }));
   const allCats = [...CATEGORIES.map((c) => ({ ...c, isCustom: false })), ...customCats];
   const getLabel = (cat) => config[cat.id]?.label || cat.label;
-  const mBtn = (extra = {}) => ({ padding: "3px 7px", background: "transparent", border: "1px solid #334155", color: "#64748b", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: "Manrope, sans-serif", ...extra });
+  const mBtn = (extra = {}) => ({ padding: "3px 7px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-3)", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: "Manrope, sans-serif", ...extra });
 
   // Reference codes: itemId → "PREFIX-S.I"
   const refCodes = (() => {
@@ -241,53 +233,49 @@ function ChecklistsTab({ project, userRole }) {
     setSections((p) => ({ ...p, [catId]: (p[catId] || []).filter((s) => s !== label) }));
   };
 
-  const toggleItemMilestone = async (itemId, milestoneId, add) => {
+  const toggleItemMilestone = (itemId, milestoneId, add) => {
+    // Optimistic state update — no await needed, DB call is fire-and-forget
     setItemMilestones((prev) => {
       const next = { ...prev };
-      if (!next[itemId]) next[itemId] = new Set();
-      else next[itemId] = new Set(next[itemId]);
+      next[itemId] = new Set(next[itemId] || []);
       add ? next[itemId].add(milestoneId) : next[itemId].delete(milestoneId);
       return next;
     });
     if (add) {
-      await supabase.from("milestone_items").insert({ milestone_id: milestoneId, checklist_item_id: itemId });
+      supabase.from("milestone_items").insert({ milestone_id: milestoneId, checklist_item_id: itemId });
     } else {
-      await supabase.from("milestone_items").delete()
+      supabase.from("milestone_items").delete()
         .eq("milestone_id", milestoneId).eq("checklist_item_id", itemId);
     }
   };
 
-  const bulkToggleMilestone = async (itemIds, milestoneId, add) => {
-    for (const itemId of itemIds) {
-      const has = itemMilestones[itemId]?.has(milestoneId) ?? false;
-      if (add && !has) await toggleItemMilestone(itemId, milestoneId, true);
-      if (!add && has) await toggleItemMilestone(itemId, milestoneId, false);
-    }
-  };
+  const bulkToggleMilestone = (itemIds, milestoneId, add) => {
+    // Determine which items actually need to change
+    const toChange = itemIds.filter((id) => {
+      const has = itemMilestones[id]?.has(milestoneId) ?? false;
+      return add ? !has : has;
+    });
+    if (!toChange.length) return;
 
-  const MilestonePicker = ({ anchorKey, itemIds }) => {
-    if (milestonePickerOpen !== anchorKey || milestones.length === 0) return null;
-    const allAssigned = milestones.map((m) => ({
-      ...m,
-      assigned: itemIds.every((id) => itemMilestones[id]?.has(m.id)),
-      partial: itemIds.some((id) => itemMilestones[id]?.has(m.id)) && !itemIds.every((id) => itemMilestones[id]?.has(m.id)),
-    }));
-    return (
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 100, background: "#1e293b", border: "1px solid #0095da", borderRadius: "8px", padding: "8px", minWidth: "180px", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", right: 0, top: "100%", marginTop: "4px" }}>
-        <p style={{ color: "#64748b", fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 6px 4px" }}>Assign to milestone</p>
-        {allAssigned.map((m) => (
-          <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 6px", borderRadius: "5px", cursor: "pointer", color: m.assigned ? "#7dd3fc" : m.partial ? "#f59e0b" : "#94a3b8", fontSize: "12px" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "#0f172a"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
-            <input type="checkbox" checked={m.assigned} ref={(el) => { if (el) el.indeterminate = m.partial; }}
-              onChange={(e) => bulkToggleMilestone(itemIds, m.id, e.target.checked)}
-              style={{ accentColor: "#0095da", flexShrink: 0 }} />
-            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
-          </label>
-        ))}
-        <button onClick={() => setMilestonePickerOpen(null)} style={{ width: "100%", marginTop: "6px", padding: "4px", background: "transparent", border: "1px solid #334155", borderRadius: "5px", color: "#64748b", fontSize: "11px", cursor: "pointer" }}>Close</button>
-      </div>
-    );
+    // Optimistic batch state update
+    setItemMilestones((prev) => {
+      const next = { ...prev };
+      toChange.forEach((id) => {
+        next[id] = new Set(next[id] || []);
+        add ? next[id].add(milestoneId) : next[id].delete(milestoneId);
+      });
+      return next;
+    });
+
+    // Single batched DB call
+    if (add) {
+      supabase.from("milestone_items").insert(
+        toChange.map((id) => ({ milestone_id: milestoneId, checklist_item_id: id }))
+      );
+    } else {
+      supabase.from("milestone_items").delete()
+        .eq("milestone_id", milestoneId).in("checklist_item_id", toChange);
+    }
   };
 
   const handleDragEnd = () => { dragInfo.current = null; setDragOver(null); };
@@ -361,32 +349,32 @@ function ChecklistsTab({ project, userRole }) {
     ));
   };
 
-  if (loading) return <p style={{ color: "#94a3b8" }}>Loading...</p>;
+  if (loading) return <p style={{ color: "var(--c-text-2)" }}>Loading...</p>;
 
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
-        <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>
+        <p style={{ color: "var(--c-text-2)", fontSize: "13px", margin: 0 }}>
           {canEdit ? "Manage checklist categories, sections, and items for this project." : "View checklist items for this project. Only project managers can edit."}
         </p>
         {canEdit && (
-          <button onClick={() => setAddingCat(true)} style={{ padding: "7px 14px", background: "#0095da", color: "white", border: "none", borderRadius: "7px", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Manrope, sans-serif", flexShrink: 0 }}>
+          <button onClick={() => setAddingCat(true)} style={{ padding: "7px 14px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "7px", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Manrope, sans-serif", flexShrink: 0 }}>
             + Add Checklist
           </button>
         )}
       </div>
 
       {addingCat && (
-        <div style={{ background: "#0f172a", border: "1px solid #0095da", borderRadius: "10px", padding: "14px 16px", marginBottom: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
+        <div style={{ background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "10px", padding: "14px 16px", marginBottom: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
           <input autoFocus value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") addCustomCategory(); if (e.key === "Escape") { setAddingCat(false); setNewCatName(""); } }}
             placeholder="Checklist name (e.g. MEP Coordination)"
-            style={{ flex: 1, padding: "8px 12px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "7px", color: "#f1f5f9", fontSize: "14px" }}
+            style={{ flex: 1, padding: "8px 12px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "7px", color: "var(--c-text)", fontSize: "14px" }}
           />
-          <button onClick={addCustomCategory} disabled={savingCat || !newCatName.trim()} style={{ padding: "8px 16px", background: "#0095da", color: "white", border: "none", borderRadius: "7px", cursor: savingCat ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "600" }}>
+          <button onClick={addCustomCategory} disabled={savingCat || !newCatName.trim()} style={{ padding: "8px 16px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "7px", cursor: savingCat ? "not-allowed" : "pointer", fontSize: "13px", fontWeight: "600" }}>
             {savingCat ? "..." : "Create"}
           </button>
-          <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{ padding: "8px 12px", background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: "7px", cursor: "pointer", fontSize: "13px" }}>x</button>
+          <button onClick={() => { setAddingCat(false); setNewCatName(""); }} style={{ padding: "8px 12px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-2)", borderRadius: "7px", cursor: "pointer", fontSize: "13px" }}>x</button>
         </div>
       )}
 
@@ -398,10 +386,10 @@ function ChecklistsTab({ project, userRole }) {
           const catSections = sections[cat.id] || [];
           const isRenamingThis = renamingCat === cat.id;
           return (
-            <div key={cat.id} style={{ background: "#0f172a", borderRadius: "10px", border: `1px solid ${isExpanded ? "#0095da" : enabled ? "#334155" : "#1e293b"}`, overflow: "hidden", opacity: enabled ? 1 : 0.6 }}>
+            <div key={cat.id} style={{ background: "var(--c-bg)", borderRadius: "10px", border: `1px solid ${isExpanded ? "var(--c-accent)" : enabled ? "var(--c-border)" : "var(--c-surface)"}`, overflow: "hidden", opacity: enabled ? 1 : 0.6 }}>
               <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 16px" }}>
                 {canEdit && (
-                  <button onClick={() => toggle(cat.id)} style={{ padding: "3px 10px", borderRadius: "20px", border: "1px solid", fontSize: "10px", fontWeight: "700", cursor: "pointer", flexShrink: 0, background: enabled ? "#1a3318" : "#1e293b", borderColor: enabled ? "#4da447" : "#334155", color: enabled ? "#7ecb7b" : "#64748b" }}>
+                  <button onClick={() => toggle(cat.id)} style={{ padding: "3px 10px", borderRadius: "20px", border: "1px solid", fontSize: "10px", fontWeight: "700", cursor: "pointer", flexShrink: 0, background: enabled ? "var(--c-ok-bg)" : "var(--c-surface)", borderColor: enabled ? "var(--c-ok)" : "var(--c-border)", color: enabled ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
                     {enabled ? "ON" : "OFF"}
                   </button>
                 )}
@@ -410,16 +398,16 @@ function ChecklistsTab({ project, userRole }) {
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                       <input autoFocus value={renameCatText} onChange={(e) => setRenameCatText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") saveRename(cat.id); if (e.key === "Escape") setRenamingCat(null); }}
-                        style={{ flex: 1, padding: "5px 8px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "6px", color: "#f1f5f9", fontSize: "13px" }}
+                        style={{ flex: 1, padding: "5px 8px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "6px", color: "var(--c-text)", fontSize: "13px" }}
                       />
-                      <button onClick={() => saveRename(cat.id)} style={{ padding: "4px 10px", background: "#0095da", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Save</button>
-                      <button onClick={() => setRenamingCat(null)} style={{ padding: "4px 8px", background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: "5px", cursor: "pointer", fontSize: "12px" }}>x</button>
+                      <button onClick={() => saveRename(cat.id)} style={{ padding: "4px 10px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>Save</button>
+                      <button onClick={() => setRenamingCat(null)} style={{ padding: "4px 8px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-2)", borderRadius: "5px", cursor: "pointer", fontSize: "12px" }}>x</button>
                     </div>
                   ) : (
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                      <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{getLabel(cat)}</span>
-                      {cat.isCustom && <span style={{ fontSize: "10px", color: "#0095da", background: "#012d5a", padding: "1px 7px", borderRadius: "20px", fontWeight: "600" }}>custom</span>}
-                      <span style={{ color: "#64748b", fontSize: "11px" }}>{catItems.length} items</span>
+                      <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{getLabel(cat)}</span>
+                      {cat.isCustom && <span style={{ fontSize: "10px", color: "var(--c-accent)", background: "var(--c-accent-dk)", padding: "1px 7px", borderRadius: "20px", fontWeight: "600" }}>custom</span>}
+                      <span style={{ color: "var(--c-text-3)", fontSize: "11px" }}>{catItems.length} items</span>
                     </div>
                   )}
                 </div>
@@ -432,7 +420,7 @@ function ChecklistsTab({ project, userRole }) {
                           const isActive = allItemIds.length > 0 && allItemIds.every((id) => itemMilestones[id]?.has(m.id));
                           return (
                             <button key={m.id} onClick={(e) => { e.stopPropagation(); bulkToggleMilestone(allItemIds, m.id, !isActive); }}
-                              style={{ padding: "2px 8px", border: `1px solid ${isActive ? "#0095da" : "#334155"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: isActive ? "#012d5a" : "transparent", color: isActive ? "#33bdef" : "#475569", whiteSpace: "nowrap" }}>
+                              style={{ padding: "2px 8px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
                               {m.name}
                             </button>
                           );
@@ -440,10 +428,10 @@ function ChecklistsTab({ project, userRole }) {
                       </div>
                     )}
                     <button onClick={() => { setRenamingCat(cat.id); setRenameCatText(getLabel(cat)); }} style={mBtn()}>Rename</button>
-                    {cat.isCustom && <button onClick={() => deleteCustomCat(cat.id)} style={mBtn({ color: "#ef4444" })}>x</button>}
+                    {cat.isCustom && <button onClick={() => deleteCustomCat(cat.id)} style={mBtn({ color: "var(--c-err)" })}>x</button>}
                   </div>
                 )}
-                <button onClick={() => setExpandedCat(expandedCat === cat.id ? null : cat.id)} style={{ background: "none", border: "none", color: isExpanded ? "#0095da" : "#64748b", cursor: "pointer", padding: "4px 6px", fontSize: "13px", flexShrink: 0 }}>
+                <button onClick={() => setExpandedCat(expandedCat === cat.id ? null : cat.id)} style={{ background: "none", border: "none", color: isExpanded ? "var(--c-accent)" : "var(--c-text-3)", cursor: "pointer", padding: "4px 6px", fontSize: "13px", flexShrink: 0 }}>
                   {isExpanded ? "^" : "v"}
                 </button>
               </div>
@@ -463,22 +451,22 @@ function ChecklistsTab({ project, userRole }) {
                           onDragOver={(e) => handleSectionDragOver(e, cat.id, sLabel, sIdx)}
                           onDrop={(e) => handleSectionDrop(e, cat.id, sLabel, sIdx)}
                           onDragEnd={handleDragEnd}
-                          style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px 6px 8px", background: isSectionDT ? "#012d5a" : isOrderT ? "#0d2340" : "#0c1a28", borderLeft: `3px solid ${isSectionDT ? "#f59e0b" : "#0095da"}`, borderRadius: "0 6px 6px 0", marginBottom: "4px", cursor: canEdit && !isRenSec ? "grab" : "default", transition: "background 0.12s" }}
+                          style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px 6px 8px", background: isSectionDT ? "var(--c-accent-dk)" : isOrderT ? "var(--c-surface-alt)" : "var(--c-surface-alt)", borderLeft: `3px solid ${isSectionDT ? "var(--c-warn)" : "var(--c-accent)"}`, borderRadius: "0 6px 6px 0", marginBottom: "4px", cursor: canEdit && !isRenSec ? "grab" : "default", transition: "background 0.12s" }}
                         >
-                          {canEdit && <span style={{ color: "#475569", fontSize: "14px", userSelect: "none", flexShrink: 0 }}>:</span>}
+                          {canEdit && <span style={{ color: "var(--c-text-4)", fontSize: "14px", userSelect: "none", flexShrink: 0 }}>:</span>}
                           {isRenSec ? (
                             <div style={{ display: "flex", gap: "6px", flex: 1, alignItems: "center" }} onClick={(e) => e.stopPropagation()}>
                               <input autoFocus value={renameSectionText} onChange={(e) => setRenameSectionText(e.target.value)}
                                 onKeyDown={(e) => { if (e.key === "Enter") renameSection(cat.id, sLabel); if (e.key === "Escape") setRenamingSection(null); }}
-                                style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "12px" }}
+                                style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px" }}
                               />
-                              <button onClick={() => renameSection(cat.id, sLabel)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                              <button onClick={() => renameSection(cat.id, sLabel)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button>
                               <button onClick={() => setRenamingSection(null)} style={mBtn()}>x</button>
                             </div>
                           ) : (
                             <>
-                              <span style={{ flex: 1, color: "#7dd3fc", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>{sLabel}</span>
-                              {isSectionDT && <span style={{ color: "#f59e0b", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>}
+                              <span style={{ flex: 1, color: "var(--c-accent-lt)", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>{sLabel}</span>
+                              {isSectionDT && <span style={{ color: "var(--c-warn)", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>}
                               {canEdit && milestones.length > 0 && (() => {
                                 const secItemIds = catItems.filter((i) => i.sub_section === sLabel).map((i) => i.id);
                                 return (
@@ -487,7 +475,7 @@ function ChecklistsTab({ project, userRole }) {
                                       const isActive = secItemIds.length > 0 && secItemIds.every((id) => itemMilestones[id]?.has(m.id));
                                       return (
                                         <button key={m.id} onClick={(e) => { e.stopPropagation(); bulkToggleMilestone(secItemIds, m.id, !isActive); }}
-                                          style={{ padding: "2px 7px", border: `1px solid ${isActive ? "#0095da" : "#334155"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: isActive ? "#012d5a" : "transparent", color: isActive ? "#33bdef" : "#475569", whiteSpace: "nowrap" }}>
+                                          style={{ padding: "2px 7px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
                                           {m.name}
                                         </button>
                                       );
@@ -498,7 +486,7 @@ function ChecklistsTab({ project, userRole }) {
                               {canEdit && (
                                 <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                   <button onClick={() => { setRenamingSection({ catId: cat.id, label: sLabel }); setRenameSectionText(sLabel); }} style={mBtn()}>Rename</button>
-                                  <button onClick={() => deleteSection(cat.id, sLabel)} style={mBtn({ color: "#ef4444" })}>x</button>
+                                  <button onClick={() => deleteSection(cat.id, sLabel)} style={mBtn({ color: "var(--c-err)" })}>x</button>
                                 </div>
                               )}
                             </>
@@ -514,20 +502,20 @@ function ChecklistsTab({ project, userRole }) {
                                 onDragOver={(e) => handleItemDragOver(e, cat.id, item.id)}
                                 onDrop={(e) => handleItemDrop(e, cat.id, item.id, item.sub_section)}
                                 onDragEnd={handleDragEnd}
-                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "0 6px 6px 0", borderLeft: `2px solid ${isDO ? "#0095da" : "#29439b"}`, background: isDO ? "#012d5a" : "#1a2a3a", opacity: isBDi ? 0.3 : 1, transition: "background 0.1s" }}
+                                style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "0 6px 6px 0", borderLeft: `2px solid ${isDO ? "var(--c-accent)" : "var(--c-accent-2)"}`, background: isDO ? "var(--c-accent-dk)" : "var(--c-surface-item)", opacity: isBDi ? 0.3 : 1, transition: "background 0.1s" }}
                               >
-                                {canEdit && <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>:</span>}
+                                {canEdit && <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>:</span>}
                                 {editingItemId === item.id ? (
                                   <input autoFocus value={editItemText} onChange={(e) => setEditItemText(e.target.value)}
                                     onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                    style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                    style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
                                   />
                                 ) : (
-                                  <span style={{ flex: 1, color: "#cbd5e1", fontSize: "13px", lineHeight: 1.4 }}>
-                                    {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "#475569", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
+                                  <span style={{ flex: 1, color: "var(--c-text-4)", fontSize: "13px", lineHeight: 1.4 }}>
+                                    {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "var(--c-text-4)", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
                                     {item.item_text}
-                                    {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
-                                    {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
+                                    {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
+                                    {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--c-purple)", background: "var(--c-purple-bg)", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
                                   </span>
                                 )}
                                 {milestones.length > 0 && (
@@ -537,7 +525,7 @@ function ChecklistsTab({ project, userRole }) {
                                       return (
                                         <button key={m.id} onClick={(e) => { e.stopPropagation(); if (canEdit) toggleItemMilestone(item.id, m.id, !isActive); }}
                                           disabled={!canEdit}
-                                          style={{ padding: "1px 6px", border: `1px solid ${isActive ? "#0095da" : "#334155"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "#012d5a" : "transparent", color: isActive ? "#33bdef" : "#475569", whiteSpace: "nowrap" }}>
+                                          style={{ padding: "1px 6px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
                                           {m.name}
                                         </button>
                                       );
@@ -547,8 +535,8 @@ function ChecklistsTab({ project, userRole }) {
                                 {canEdit && (
                                   <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                     {editingItemId === item.id
-                                      ? <><button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button><button onClick={() => setEditingItemId(null)} style={mBtn()}>x</button></>
-                                      : <><button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button><button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>x</button></>
+                                      ? <><button onClick={() => saveItemEdit(item)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button><button onClick={() => setEditingItemId(null)} style={mBtn()}>x</button></>
+                                      : <><button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button><button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>x</button></>
                                     }
                                   </div>
                                 )}
@@ -560,16 +548,16 @@ function ChecklistsTab({ project, userRole }) {
                           <div style={{ display: "flex", gap: "6px", marginTop: "4px", marginLeft: "12px" }}>
                             <input autoFocus value={newItemText} onChange={(e) => setNewItemText(e.target.value)}
                               onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, sLabel); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
-                              placeholder="New item text..." style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                              placeholder="New item text..." style={{ flex: 1, padding: "6px 9px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                             />
-                            <button onClick={() => addItem(cat.id, sLabel)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                            <button onClick={() => addItem(cat.id, sLabel)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
                             <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>x</button>
                           </div>
                         ) : (
                           <button onClick={() => setAddingTo({ catId: cat.id, section: sLabel })}
-                            style={{ display: "block", width: "calc(100% - 12px)", marginLeft: "12px", marginTop: "4px", padding: "5px", background: "transparent", border: "1px dashed #29439b", borderRadius: "5px", color: "#475569", fontSize: "11px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
-                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#7dd3fc"; }}
-                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#29439b"; e.currentTarget.style.color = "#475569"; }}
+                            style={{ display: "block", width: "calc(100% - 12px)", marginLeft: "12px", marginTop: "4px", padding: "5px", background: "transparent", border: "1px dashed #29439b", borderRadius: "5px", color: "var(--c-text-4)", fontSize: "11px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-accent)"; e.currentTarget.style.color = "var(--c-accent-lt)"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-accent-2)"; e.currentTarget.style.color = "var(--c-text-4)"; }}
                           >+ Add Item to "{sLabel}"</button>
                         ))}
                       </div>
@@ -585,7 +573,7 @@ function ChecklistsTab({ project, userRole }) {
                             {catSections.length > 0 && (
                               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
                                 <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
-                                <span style={{ color: "#475569", fontSize: "10px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>No Section</span>
+                                <span style={{ color: "var(--c-text-4)", fontSize: "10px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>No Section</span>
                                 <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
                               </div>
                             )}
@@ -599,37 +587,37 @@ function ChecklistsTab({ project, userRole }) {
                                     onDragOver={(e) => handleItemDragOver(e, cat.id, item.id)}
                                     onDrop={(e) => handleItemDrop(e, cat.id, item.id, null)}
                                     onDragEnd={handleDragEnd}
-                                    style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "6px", borderLeft: `2px dashed ${isDO ? "#0095da" : "#334155"}`, background: isDO ? "#012d5a" : "#1e293b", opacity: isBDi ? 0.3 : 1, transition: "background 0.1s" }}
+                                    style={{ display: "flex", alignItems: "center", gap: "8px", padding: "6px 10px", borderRadius: "6px", borderLeft: `2px dashed ${isDO ? "var(--c-accent)" : "var(--c-border)"}`, background: isDO ? "var(--c-accent-dk)" : "var(--c-surface)", opacity: isBDi ? 0.3 : 1, transition: "background 0.1s" }}
                                   >
-                                    {canEdit && <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>:</span>}
+                                    {canEdit && <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>:</span>}
                                     {editingItemId === item.id ? (
                                       <input autoFocus value={editItemText} onChange={(e) => setEditItemText(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                        style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                        style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
                                       />
                                     ) : (
-                                      <span style={{ flex: 1, color: "#94a3b8", fontSize: "13px", lineHeight: 1.4 }}>
-                                        {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "#475569", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
+                                      <span style={{ flex: 1, color: "var(--c-text-2)", fontSize: "13px", lineHeight: 1.4 }}>
+                                        {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "var(--c-text-4)", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
                                         {item.item_text}
-                                        {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
-                                        {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
+                                        {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
+                                        {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "var(--c-purple)", background: "var(--c-purple-bg)", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
                                       </span>
                                     )}
                                     {milestones.length > 0 && (
                                       <div style={{ position: "relative", flexShrink: 0, display: "flex", alignItems: "center", gap: "3px" }}>
                                         {[...(itemMilestones[item.id] || [])].map((msId) => {
                                           const ms = milestones.find((m) => m.id === msId);
-                                          return ms ? <span key={msId} style={{ fontSize: "9px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "3px", padding: "1px 4px", whiteSpace: "nowrap", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis" }}>{ms.name}</span> : null;
+                                          return ms ? <span key={msId} style={{ fontSize: "9px", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "3px", padding: "1px 4px", whiteSpace: "nowrap", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis" }}>{ms.name}</span> : null;
                                         })}
-                                        {canEdit && <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === item.id ? null : item.id); }} style={{ ...mBtn(), padding: "1px 5px", fontSize: "10px", color: "#0095da", borderColor: "#0095da" }}>+ms</button>}
+                                        {canEdit && <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === item.id ? null : item.id); }} style={{ ...mBtn(), padding: "1px 5px", fontSize: "10px", color: "var(--c-accent)", borderColor: "var(--c-accent)" }}>+ms</button>}
                                         <MilestonePicker anchorKey={item.id} itemIds={[item.id]} />
                                       </div>
                                     )}
                                     {canEdit && (
                                       <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                         {editingItemId === item.id
-                                          ? <><button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button><button onClick={() => setEditingItemId(null)} style={mBtn()}>x</button></>
-                                          : <><button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button><button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>x</button></>
+                                          ? <><button onClick={() => saveItemEdit(item)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none" })}>Save</button><button onClick={() => setEditingItemId(null)} style={mBtn()}>x</button></>
+                                          : <><button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button><button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>x</button></>
                                         }
                                       </div>
                                     )}
@@ -643,9 +631,9 @@ function ChecklistsTab({ project, userRole }) {
                           <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
                             <input autoFocus value={newItemText} onChange={(e) => setNewItemText(e.target.value)}
                               onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, null); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
-                              placeholder="New item text..." style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                              placeholder="New item text..." style={{ flex: 1, padding: "6px 9px", background: "var(--c-surface)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                             />
-                            <button onClick={() => addItem(cat.id, null)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                            <button onClick={() => addItem(cat.id, null)} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
                             <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>x</button>
                           </div>
                         )}
@@ -656,15 +644,15 @@ function ChecklistsTab({ project, userRole }) {
                   {canEdit && addingTo?.catId !== cat.id && (
                     <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
                       <button onClick={() => setAddingTo({ catId: cat.id, section: null })}
-                        style={{ flex: 1, padding: "6px 10px", background: "transparent", border: "1px dashed #334155", borderRadius: "6px", color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
+                        style={{ flex: 1, padding: "6px 10px", background: "transparent", border: "1px dashed #334155", borderRadius: "6px", color: "var(--c-text-3)", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "var(--c-accent)"; e.currentTarget.style.color = "var(--c-accent-lt)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "var(--c-border)"; e.currentTarget.style.color = "var(--c-text-3)"; }}>
                         {catSections.length > 0 ? "+ Add Item (No Section)" : "+ Add Item"}
                       </button>
                       {addingSection !== cat.id && (
                         <button onClick={() => { setAddingSection(cat.id); setNewSectionText(""); }}
-                          style={{ padding: "6px 12px", background: "transparent", border: "1px dashed #0095da", borderRadius: "6px", color: "#0095da", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
-                          onMouseEnter={(e) => { e.currentTarget.style.background = "#012d5a"; }}
+                          style={{ padding: "6px 12px", background: "transparent", border: "1px dashed #0095da", borderRadius: "6px", color: "var(--c-accent)", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}
+                          onMouseEnter={(e) => { e.currentTarget.style.background = "var(--c-accent-dk)"; }}
                           onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
                           + Add Section
                         </button>
@@ -673,12 +661,12 @@ function ChecklistsTab({ project, userRole }) {
                   )}
                   {addingSection === cat.id && (
                     <div style={{ display: "flex", gap: "6px", marginTop: "8px", alignItems: "center" }}>
-                      <div style={{ width: "3px", background: "#0095da", borderRadius: "2px", alignSelf: "stretch", flexShrink: 0 }} />
+                      <div style={{ width: "3px", background: "var(--c-accent)", borderRadius: "2px", alignSelf: "stretch", flexShrink: 0 }} />
                       <input autoFocus value={newSectionText} onChange={(e) => setNewSectionText(e.target.value)}
                         onKeyDown={(e) => { if (e.key === "Enter") addSection(cat.id); if (e.key === "Escape") setAddingSection(null); }}
-                        placeholder="Section name..." style={{ flex: 1, padding: "6px 10px", background: "#0c1a28", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                        placeholder="Section name..." style={{ flex: 1, padding: "6px 10px", background: "var(--c-surface-alt)", border: "1px solid #0095da", borderRadius: "5px", color: "var(--c-text)", fontSize: "13px" }}
                       />
-                      <button onClick={() => addSection(cat.id)} disabled={!newSectionText.trim()} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Create</button>
+                      <button onClick={() => addSection(cat.id)} disabled={!newSectionText.trim()} style={mBtn({ background: "var(--c-accent)", color: "white", border: "none", padding: "6px 12px" })}>Create</button>
                       <button onClick={() => setAddingSection(null)} style={mBtn({ padding: "6px 9px" })}>x</button>
                     </div>
                   )}
@@ -756,19 +744,19 @@ function MilestonesTab({ project }) {
 
   return (
     <div>
-      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: 0 }}>
+      <p style={{ color: "var(--c-text-2)", fontSize: "14px", marginTop: 0 }}>
         Define milestones and alert windows. Assign checklist items to milestones from the Checklists tab.
       </p>
 
       {error && (
-        <div style={{ background: "#450a0a", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "#fca5a5", fontSize: "13px" }}>
+        <div style={{ background: "var(--c-err-bg)", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "var(--c-err-text)", fontSize: "13px" }}>
           {error}
         </div>
       )}
 
       {/* Add form */}
-      <form onSubmit={add} style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "24px", border: "1px solid #334155" }}>
-        <p style={{ color: "#33bdef", fontSize: "13px", fontWeight: "600", margin: "0 0 12px" }}>Add New Milestone</p>
+      <form onSubmit={add} style={{ background: "var(--c-bg)", borderRadius: "8px", padding: "16px", marginBottom: "24px", border: "1px solid #334155" }}>
+        <p style={{ color: "var(--c-accent-lt)", fontSize: "13px", fontWeight: "600", margin: "0 0 12px" }}>Add New Milestone</p>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "12px", alignItems: "end" }}>
           <div>
             <label style={labelStyle}>Milestone Name</label>
@@ -784,7 +772,7 @@ function MilestonesTab({ project }) {
           </div>
         </div>
         <button type="submit" disabled={saving} style={{
-          marginTop: "12px", padding: "8px 20px", background: "#0095da", color: "white",
+          marginTop: "12px", padding: "8px 20px", background: "var(--c-accent)", color: "white",
           border: "none", borderRadius: "6px", cursor: saving ? "not-allowed" : "pointer", fontSize: "14px", fontWeight: "600",
         }}>
           {saving ? "Adding..." : "+ Add Milestone"}
@@ -793,9 +781,9 @@ function MilestonesTab({ project }) {
 
       {/* List */}
       {loading ? (
-        <p style={{ color: "#94a3b8" }}>Loading milestones...</p>
+        <p style={{ color: "var(--c-text-2)" }}>Loading milestones...</p>
       ) : milestones.length === 0 ? (
-        <p style={{ color: "#64748b", fontSize: "14px" }}>No milestones yet. Add one above.</p>
+        <p style={{ color: "var(--c-text-3)", fontSize: "14px" }}>No milestones yet. Add one above.</p>
       ) : (
         <div style={{ display: "grid", gap: "12px" }}>
           {milestones.map((m) => {
@@ -806,7 +794,7 @@ function MilestonesTab({ project }) {
 
             if (isEditing) {
               return (
-                <div key={m.id} style={{ background: "#0f172a", border: "1px solid #0095da", borderRadius: "8px", padding: "14px 16px" }}>
+                <div key={m.id} style={{ background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "8px", padding: "14px 16px" }}>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "10px", alignItems: "end", marginBottom: "10px" }}>
                     <div>
                       <label style={labelStyle}>Name</label>
@@ -822,10 +810,10 @@ function MilestonesTab({ project }) {
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => saveEdit(m.id)} disabled={editSaving} style={{ padding: "6px 14px", background: "#4da447", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
+                    <button onClick={() => saveEdit(m.id)} disabled={editSaving} style={{ padding: "6px 14px", background: "var(--c-ok)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
                       {editSaving ? "Saving..." : "Save"}
                     </button>
-                    <button onClick={cancelEdit} style={{ padding: "6px 14px", background: "transparent", color: "#94a3b8", border: "1px solid #334155", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
+                    <button onClick={cancelEdit} style={{ padding: "6px 14px", background: "transparent", color: "var(--c-text-2)", border: "1px solid #334155", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
                       Cancel
                     </button>
                   </div>
@@ -836,21 +824,21 @@ function MilestonesTab({ project }) {
             return (
               <div key={m.id} style={{
                 display: "flex", justifyContent: "space-between", alignItems: "center",
-                padding: "12px 16px", background: "#0f172a", borderRadius: "8px",
-                border: `1px solid ${isAlert ? "#f59e0b" : "#334155"}`,
+                padding: "12px 16px", background: "var(--c-bg)", borderRadius: "8px",
+                border: `1px solid ${isAlert ? "var(--c-warn)" : "var(--c-border)"}`,
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                  <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
-                  <span style={{ color: "#94a3b8", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
-                  <span style={{ color: "#64748b", fontSize: "12px" }}>alert {m.days_before_alert}d before</span>
-                  {isAlert && <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "2px 8px", borderRadius: "20px" }}>⚠ {d}d remaining</span>}
-                  {isPast && <span style={{ fontSize: "11px", color: "#64748b" }}>Past</span>}
+                  <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
+                  <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
+                  <span style={{ color: "var(--c-text-3)", fontSize: "12px" }}>alert {m.days_before_alert}d before</span>
+                  {isAlert && <span style={{ fontSize: "11px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 8px", borderRadius: "20px" }}>⚠ {d}d remaining</span>}
+                  {isPast && <span style={{ fontSize: "11px", color: "var(--c-text-3)" }}>Past</span>}
                 </div>
                 <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                  <button onClick={() => startEdit(m)} style={{ padding: "5px 12px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                  <button onClick={() => startEdit(m)} style={{ padding: "5px 12px", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
                     Edit
                   </button>
-                  <button onClick={() => remove(m.id)} style={{ padding: "5px 12px", background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                  <button onClick={() => remove(m.id)} style={{ padding: "5px 12px", background: "transparent", color: "var(--c-err)", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
                     Delete
                   </button>
                 </div>
@@ -943,16 +931,16 @@ function MembersTab({ project, session, userRole, org }) {
 
   return (
     <div>
-      <p style={{ color: "#94a3b8", fontSize: "13px", marginTop: 0, marginBottom: "16px" }}>
+      <p style={{ color: "var(--c-text-2)", fontSize: "13px", marginTop: 0, marginBottom: "16px" }}>
         Assign organization members to this project with a specific role. To add someone new, invite them to the organization first via Settings → Members.
       </p>
 
       {/* Add from org members */}
       {orgMembers.length > 0 ? (
-        <form onSubmit={addMember} style={{ background: "#0f172a", borderRadius: "8px", padding: "16px", marginBottom: "16px", border: "1px solid #334155" }}>
-          <p style={{ color: "#33bdef", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Add Team Member</p>
+        <form onSubmit={addMember} style={{ background: "var(--c-bg)", borderRadius: "8px", padding: "16px", marginBottom: "16px", border: "1px solid #334155" }}>
+          <p style={{ color: "var(--c-accent-lt)", fontSize: "12px", fontWeight: "700", margin: "0 0 12px", textTransform: "uppercase", letterSpacing: "0.05em" }}>Add Team Member</p>
           {error && (
-            <div style={{ color: "#fca5a5", fontSize: "13px", marginBottom: "12px", background: "#450a0a", padding: "8px 12px", borderRadius: "6px", border: "1px solid #ef4444" }}>{error}</div>
+            <div style={{ color: "var(--c-err-text)", fontSize: "13px", marginBottom: "12px", background: "var(--c-err-bg)", padding: "8px 12px", borderRadius: "6px", border: "1px solid #ef4444" }}>{error}</div>
           )}
           <div style={{ display: "flex", gap: "10px", alignItems: "flex-end", flexWrap: "wrap" }}>
             <div style={{ flex: 2, minWidth: "160px" }}>
@@ -975,7 +963,7 @@ function MembersTab({ project, session, userRole, org }) {
               </select>
             </div>
             <button type="submit" disabled={adding || !selectedUserId} style={{
-              padding: "10px 16px", background: "#0095da", color: "white", border: "none",
+              padding: "10px 16px", background: "var(--c-accent)", color: "white", border: "none",
               borderRadius: "8px", cursor: adding || !selectedUserId ? "not-allowed" : "pointer",
               fontSize: "14px", fontWeight: "600", whiteSpace: "nowrap", flexShrink: 0,
             }}>
@@ -984,33 +972,33 @@ function MembersTab({ project, session, userRole, org }) {
           </div>
         </form>
       ) : !loading && (
-        <div style={{ background: "#0f172a", borderRadius: "8px", padding: "14px 16px", marginBottom: "16px", border: "1px solid #334155", color: "#64748b", fontSize: "13px" }}>
+        <div style={{ background: "var(--c-bg)", borderRadius: "8px", padding: "14px 16px", marginBottom: "16px", border: "1px solid #334155", color: "var(--c-text-3)", fontSize: "13px" }}>
           All organization members are already on this project.
         </div>
       )}
 
       {/* Current team list */}
       {loading ? (
-        <p style={{ color: "#94a3b8" }}>Loading...</p>
+        <p style={{ color: "var(--c-text-2)" }}>Loading...</p>
       ) : (
         <div style={{ display: "grid", gap: "8px" }}>
           {members.map((m) => (
-            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "#0f172a", borderRadius: "8px", border: "1px solid #334155", flexWrap: "wrap", gap: "8px" }}>
+            <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--c-bg)", borderRadius: "8px", border: "1px solid #334155", flexWrap: "wrap", gap: "8px" }}>
               <div>
-                <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.profile?.full_name || "Unknown"}</span>
-                <span style={{ color: "#64748b", fontSize: "12px", marginLeft: "8px" }}>{m.profile?.email}</span>
-                {m.user_id === session.user.id && <span style={{ color: "#64748b", fontSize: "11px", marginLeft: "6px" }}>(you)</span>}
+                <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{m.profile?.full_name || "Unknown"}</span>
+                <span style={{ color: "var(--c-text-3)", fontSize: "12px", marginLeft: "8px" }}>{m.profile?.email}</span>
+                {m.user_id === session.user.id && <span style={{ color: "var(--c-text-3)", fontSize: "11px", marginLeft: "6px" }}>(you)</span>}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <select value={m.role} onChange={(e) => updateRole(m.id, e.target.value)}
                   disabled={m.user_id === session.user.id}
-                  style={{ background: "#1e293b", border: "1px solid #334155", color: "#f1f5f9", borderRadius: "6px", padding: "5px 8px", fontSize: "12px" }}>
+                  style={{ background: "var(--c-surface)", border: "1px solid #334155", color: "var(--c-text)", borderRadius: "6px", padding: "5px 8px", fontSize: "12px" }}>
                   <option value="project_manager">Project Manager</option>
                   <option value="engineer">Engineer</option>
                   <option value="drafter">Drafter</option>
                 </select>
                 {m.user_id !== session.user.id && (
-                  <button onClick={() => removeMember(m.id)} style={{ background: "none", border: "1px solid #334155", color: "#ef4444", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px" }}>
+                  <button onClick={() => removeMember(m.id)} style={{ background: "none", border: "1px solid #334155", color: "var(--c-err)", cursor: "pointer", padding: "5px 10px", borderRadius: "6px", fontSize: "12px" }}>
                     Remove
                   </button>
                 )}
@@ -1053,22 +1041,22 @@ function GeneralTab({ project, onProjectRenamed }) {
 
   return (
     <div>
-      <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: 0 }}>
+      <p style={{ color: "var(--c-text-2)", fontSize: "14px", marginTop: 0 }}>
         Edit the project name and description.
       </p>
 
       {error && (
-        <div style={{ background: "#450a0a", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "#fca5a5", fontSize: "13px" }}>
+        <div style={{ background: "var(--c-err-bg)", border: "1px solid #ef4444", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "var(--c-err-text)", fontSize: "13px" }}>
           {error}
         </div>
       )}
       {success && (
-        <div style={{ background: "#1a3318", border: "1px solid #4da447", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "#a8e0a5", fontSize: "13px" }}>
+        <div style={{ background: "var(--c-ok-bg)", border: "1px solid #4da447", borderRadius: "8px", padding: "10px 14px", marginBottom: "16px", color: "#a8e0a5", fontSize: "13px" }}>
           ✓ Project updated successfully.
         </div>
       )}
 
-      <form onSubmit={save} style={{ background: "#0f172a", borderRadius: "8px", padding: "20px", border: "1px solid #334155" }}>
+      <form onSubmit={save} style={{ background: "var(--c-bg)", borderRadius: "8px", padding: "20px", border: "1px solid #334155" }}>
         <div style={{ marginBottom: "16px" }}>
           <label style={labelStyle}>Project Name *</label>
           <input
@@ -1089,7 +1077,7 @@ function GeneralTab({ project, onProjectRenamed }) {
           />
         </div>
         <button type="submit" disabled={saving || !name.trim()} style={{
-          padding: "10px 24px", background: "#0095da", color: "white", border: "none",
+          padding: "10px 24px", background: "var(--c-accent)", color: "white", border: "none",
           borderRadius: "8px", cursor: saving ? "not-allowed" : "pointer",
           fontSize: "14px", fontWeight: "600",
         }}>
@@ -1117,7 +1105,7 @@ export default function ProjectSetupModal({ project, session, org, orgRole, user
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: isMobile ? "flex-end" : "center", justifyContent: "center", zIndex: 100 }}>
       <div style={{
-        background: "#1e293b",
+        background: "var(--c-surface)",
         borderRadius: isMobile ? "16px 16px 0 0" : "16px",
         width: "100%",
         maxWidth: isMobile ? "100%" : "760px",
@@ -1128,10 +1116,10 @@ export default function ProjectSetupModal({ project, session, org, orgRole, user
       }}>
         {/* Header */}
         <div style={{ padding: isMobile ? "16px 16px 0" : "24px 24px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h2 style={{ color: "#f1f5f9", margin: 0, fontSize: isMobile ? "15px" : "18px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? "240px" : undefined }}>
+          <h2 style={{ color: "var(--c-text)", margin: 0, fontSize: isMobile ? "15px" : "18px", fontWeight: "700", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: isMobile ? "240px" : undefined }}>
             ⚙ {isMobile ? projectName : `Project Setup — ${projectName}`}
           </h2>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#94a3b8", fontSize: "26px", cursor: "pointer", lineHeight: 1, padding: "0 4px", flexShrink: 0 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--c-text-2)", fontSize: "26px", cursor: "pointer", lineHeight: 1, padding: "0 4px", flexShrink: 0 }}>
             ×
           </button>
         </div>
@@ -1144,8 +1132,8 @@ export default function ProjectSetupModal({ project, session, org, orgRole, user
               border: "none", background: "transparent", cursor: "pointer",
               fontSize: isMobile ? "13px" : "14px",
               fontWeight: tab === t ? "600" : "400",
-              color: tab === t ? "#0095da" : "#94a3b8",
-              borderBottom: `2px solid ${tab === t ? "#0095da" : "transparent"}`,
+              color: tab === t ? "var(--c-accent)" : "var(--c-text-2)",
+              borderBottom: `2px solid ${tab === t ? "var(--c-accent)" : "transparent"}`,
               marginBottom: "-1px",
               whiteSpace: "nowrap",
               flexShrink: 0,

@@ -142,19 +142,19 @@ export default function OrgDashboard({ session, org }) {
   });
 
   if (loading) return (
-    <div style={{ padding: "48px 24px", textAlign: "center", color: "#94a3b8", fontFamily: "Manrope, sans-serif" }}>
+    <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--c-text-2)", fontFamily: "Manrope, sans-serif" }}>
       Loading dashboard...
     </div>
   );
 
   return (
     <div style={{ padding: isMobile ? "20px 16px" : "32px 28px", maxWidth: "1100px", margin: "0 auto", fontFamily: "Manrope, sans-serif" }}>
-      <h2 style={{ color: "#f1f5f9", margin: "0 0 24px", fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>
+      <h2 style={{ color: "var(--c-text)", margin: "0 0 24px", fontSize: isMobile ? "18px" : "22px", fontWeight: "700" }}>
         Dashboard
       </h2>
 
       {projects.length === 0 ? (
-        <div style={{ textAlign: "center", padding: "60px 0", color: "#64748b" }}>
+        <div style={{ textAlign: "center", padding: "60px 0", color: "var(--c-text-3)" }}>
           <p style={{ fontSize: "16px" }}>No active projects yet.</p>
           <p style={{ fontSize: "13px" }}>Create a project from the Projects menu.</p>
         </div>
@@ -163,49 +163,49 @@ export default function OrgDashboard({ session, org }) {
           {/* Stat cards */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(2,1fr)" : "repeat(4,1fr)", gap: "12px", marginBottom: "24px" }}>
             {[
-              { label: "Projects", value: projects.length, color: "#0095da" },
-              { label: "Overall Progress", value: `${overallPct}%`, color: overallPct === 100 ? "#7ecb7b" : "#f1f5f9" },
-              { label: "Done", value: overall.complete, color: "#7ecb7b" },
-              { label: "Pending", value: overall.pending, color: overall.pending === 0 ? "#7ecb7b" : "#f59e0b" },
+              { label: "Projects", value: projects.length, color: "var(--c-accent)" },
+              { label: "Overall Progress", value: `${overallPct}%`, color: overallPct === 100 ? "var(--c-ok-text)" : "var(--c-text)" },
+              { label: "Done", value: overall.complete, color: "var(--c-ok-text)" },
+              { label: "Pending", value: overall.pending, color: overall.pending === 0 ? "var(--c-ok-text)" : "var(--c-warn)" },
             ].map((stat) => (
-              <div key={stat.label} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "14px" : "20px" }}>
-                <p style={{ margin: "0 0 6px", color: "#94a3b8", fontSize: "12px" }}>{stat.label}</p>
+              <div key={stat.label} style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "14px" : "20px" }}>
+                <p style={{ margin: "0 0 6px", color: "var(--c-text-2)", fontSize: "12px" }}>{stat.label}</p>
                 <p style={{ margin: 0, color: stat.color, fontSize: isMobile ? "22px" : "28px", fontWeight: "700" }}>{stat.value}</p>
               </div>
             ))}
           </div>
 
           {/* Bar chart */}
-          <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
-            <h3 style={{ color: "#f1f5f9", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>Progress by Project (%)</h3>
+          <div style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
+            <h3 style={{ color: "var(--c-text)", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>Progress by Project (%)</h3>
             <ResponsiveContainer width="100%" height={Math.max(160, projects.length * (isMobile ? 40 : 48))}>
               <BarChart data={chartData} layout="vertical" margin={{ left: isMobile ? 0 : 10, right: 30, top: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                <XAxis type="number" domain={[0, 100]} tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 12 }} tickFormatter={(v) => `${v}%`} />
-                <YAxis type="category" dataKey="name" tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 12 }} width={isMobile ? 90 : 130} />
-                <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9" }} formatter={(v) => `${v}%`} />
-                <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
-                <Bar dataKey="Complete" stackId="a" fill="#4da447" />
-                <Bar dataKey="Pending" stackId="a" fill="#334155" radius={[0, 4, 4, 0]} />
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" horizontal={false} />
+                <XAxis type="number" domain={[0, 100]} tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 10 : 12 }} tickFormatter={(v) => `${v}%`} />
+                <YAxis type="category" dataKey="name" tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 10 : 12 }} width={isMobile ? 90 : 130} />
+                <Tooltip contentStyle={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)" }} formatter={(v) => `${v}%`} />
+                <Legend wrapperStyle={{ color: "var(--c-text-2)", fontSize: "12px" }} />
+                <Bar dataKey="Complete" stackId="a" fill="var(--c-ok)" />
+                <Bar dataKey="Pending" stackId="a" fill="var(--c-border)" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
           {/* Active milestone completion chart */}
           {milestoneChartData.length > 0 && (
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
-              <h3 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: "15px", fontWeight: "600" }}>Active Milestone Progress</h3>
-              <p style={{ color: "#64748b", fontSize: "12px", margin: "0 0 16px" }}>Completed items assigned to each project's current active milestone</p>
+            <div style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
+              <h3 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: "15px", fontWeight: "600" }}>Active Milestone Progress</h3>
+              <p style={{ color: "var(--c-text-3)", fontSize: "12px", margin: "0 0 16px" }}>Completed items assigned to each project's current active milestone</p>
               <ResponsiveContainer width="100%" height={Math.max(120, milestoneChartData.length * (isMobile ? 44 : 52))}>
                 <BarChart data={milestoneChartData} layout="vertical" margin={{ left: isMobile ? 0 : 10, right: 60, top: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" horizontal={false} />
-                  <XAxis type="number" tick={{ fill: "#94a3b8", fontSize: isMobile ? 10 : 12 }} />
-                  <YAxis type="category" dataKey="name" tick={{ fill: "#94a3b8", fontSize: isMobile ? 9 : 11 }} width={isMobile ? 110 : 200} />
-                  <Tooltip contentStyle={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9" }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--c-border)" horizontal={false} />
+                  <XAxis type="number" tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 10 : 12 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fill: "var(--c-text-2)", fontSize: isMobile ? 9 : 11 }} width={isMobile ? 110 : 200} />
+                  <Tooltip contentStyle={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)" }}
                     formatter={(val, key, props) => [`${val} items (${props.payload.pct}%)`, key]} />
-                  <Legend wrapperStyle={{ color: "#94a3b8", fontSize: "12px" }} />
-                  <Bar dataKey="Complete" stackId="a" fill="#4da447" />
-                  <Bar dataKey="Remaining" stackId="a" fill="#334155" radius={[0, 4, 4, 0]} />
+                  <Legend wrapperStyle={{ color: "var(--c-text-2)", fontSize: "12px" }} />
+                  <Bar dataKey="Complete" stackId="a" fill="var(--c-ok)" />
+                  <Bar dataKey="Remaining" stackId="a" fill="var(--c-border)" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -213,21 +213,21 @@ export default function OrgDashboard({ session, org }) {
 
           {/* Upcoming milestones */}
           {milestones.length > 0 && (
-            <div style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
-              <h3 style={{ color: "#f1f5f9", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>Upcoming Milestones</h3>
+            <div style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", padding: isMobile ? "16px" : "24px", marginBottom: "24px" }}>
+              <h3 style={{ color: "var(--c-text)", margin: "0 0 16px", fontSize: "15px", fontWeight: "600" }}>Upcoming Milestones</h3>
               <div style={{ display: "grid", gap: "8px" }}>
                 {milestones.map((m) => {
                   const daysUntil = Math.ceil((new Date(m.date + "T00:00:00") - new Date()) / 86400000);
                   const isAlert = daysUntil <= m.days_before_alert;
                   return (
-                    <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "#0f172a", borderRadius: "8px", border: `1px solid ${isAlert ? "#f59e0b" : "#334155"}`, flexWrap: "wrap", gap: "6px" }}>
+                    <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", background: "var(--c-bg)", borderRadius: "8px", border: `1px solid ${isAlert ? "var(--c-warn)" : "var(--c-border)"}`, flexWrap: "wrap", gap: "6px" }}>
                       <div>
-                        <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
-                        <span style={{ color: "#64748b", fontSize: "12px", marginLeft: "10px" }}>{m.project?.name}</span>
+                        <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
+                        <span style={{ color: "var(--c-text-3)", fontSize: "12px", marginLeft: "10px" }}>{m.project?.name}</span>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                        {isAlert && <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "2px 8px", borderRadius: "20px" }}>⚠ {daysUntil}d</span>}
-                        <span style={{ color: "#94a3b8", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
+                        {isAlert && <span style={{ fontSize: "11px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 8px", borderRadius: "20px" }}>⚠ {daysUntil}d</span>}
+                        <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
                       </div>
                     </div>
                   );
@@ -237,7 +237,7 @@ export default function OrgDashboard({ session, org }) {
           )}
 
           {/* Per-project breakdown */}
-          <h3 style={{ color: "#f1f5f9", fontSize: "15px", fontWeight: "600", margin: "0 0 16px" }}>Per-Project Breakdown</h3>
+          <h3 style={{ color: "var(--c-text)", fontSize: "15px", fontWeight: "600", margin: "0 0 16px" }}>Per-Project Breakdown</h3>
           <div style={{ display: "grid", gap: "12px" }}>
             {projects.map((p) => {
               const s = stats[p.id] || {};
@@ -247,19 +247,19 @@ export default function OrgDashboard({ session, org }) {
               const isExp = expanded === p.id;
               const catSt = categoryStats[p.id] || {};
               return (
-                <div key={p.id} style={{ background: "#1e293b", border: "1px solid #334155", borderRadius: "12px", overflow: "hidden" }}>
+                <div key={p.id} style={{ background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "12px", overflow: "hidden" }}>
                   <div onClick={() => setExpanded(isExp ? null : p.id)} style={{ padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}>
                     <div>
-                      <h4 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: "15px" }}>{p.name}</h4>
-                      <p style={{ color: "#94a3b8", margin: 0, fontSize: "12px" }}>{s.complete || 0} done · {s.pending || 0} pending · {s.na || 0} N/A</p>
+                      <h4 style={{ color: "var(--c-text)", margin: "0 0 4px", fontSize: "15px" }}>{p.name}</h4>
+                      <p style={{ color: "var(--c-text-2)", margin: 0, fontSize: "12px" }}>{s.complete || 0} done · {s.pending || 0} pending · {s.na || 0} N/A</p>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                      <span style={{ color: pct === 100 ? "#7ecb7b" : "#f1f5f9", fontSize: "22px", fontWeight: "700" }}>{pct}%</span>
-                      <span style={{ color: "#64748b", fontSize: "12px" }}>{isExp ? "▲" : "▼"}</span>
+                      <span style={{ color: pct === 100 ? "var(--c-ok-text)" : "var(--c-text)", fontSize: "22px", fontWeight: "700" }}>{pct}%</span>
+                      <span style={{ color: "var(--c-text-3)", fontSize: "12px" }}>{isExp ? "▲" : "▼"}</span>
                     </div>
                   </div>
-                  <div style={{ height: "4px", background: "#0f172a", margin: "0 20px 16px" }}>
-                    <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#4da447" : "#0095da", borderRadius: "2px" }} />
+                  <div style={{ height: "4px", background: "var(--c-bg)", margin: "0 20px 16px" }}>
+                    <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "var(--c-ok)" : "var(--c-accent)", borderRadius: "2px" }} />
                   </div>
                   {isExp && (
                     <div style={{ padding: "4px 20px 20px", borderTop: "1px solid #334155" }}>
@@ -270,11 +270,11 @@ export default function OrgDashboard({ session, org }) {
                           return (
                             <div key={cat.id}>
                               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
-                                <span style={{ color: "#94a3b8", fontSize: "13px" }}>{cat.label}</span>
-                                <span style={{ color: catPct === 100 ? "#7ecb7b" : "#94a3b8", fontSize: "12px", fontWeight: "600" }}>{catPct}% ({cs.done}/{cs.total})</span>
+                                <span style={{ color: "var(--c-text-2)", fontSize: "13px" }}>{cat.label}</span>
+                                <span style={{ color: catPct === 100 ? "var(--c-ok-text)" : "var(--c-text-2)", fontSize: "12px", fontWeight: "600" }}>{catPct}% ({cs.done}/{cs.total})</span>
                               </div>
-                              <div style={{ height: "4px", background: "#0f172a", borderRadius: "2px" }}>
-                                <div style={{ height: "100%", width: `${catPct}%`, background: catPct === 100 ? "#4da447" : "#0095da", borderRadius: "2px" }} />
+                              <div style={{ height: "4px", background: "var(--c-bg)", borderRadius: "2px" }}>
+                                <div style={{ height: "100%", width: `${catPct}%`, background: catPct === 100 ? "var(--c-ok)" : "var(--c-accent)", borderRadius: "2px" }} />
                               </div>
                             </div>
                           );

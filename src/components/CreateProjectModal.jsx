@@ -3,11 +3,11 @@ import { supabase } from "../supabase";
 import { CHECKLIST_TEMPLATE, CATEGORIES } from "../checklistTemplate";
 
 const inputStyle = {
-  width: "100%", padding: "10px 12px", background: "#0f172a",
-  border: "1px solid #334155", borderRadius: "8px", color: "#f1f5f9",
+  width: "100%", padding: "10px 12px", background: "var(--c-bg)",
+  border: "1px solid #334155", borderRadius: "8px", color: "var(--c-text)",
   fontSize: "14px", boxSizing: "border-box",
 };
-const labelStyle = { display: "block", color: "#94a3b8", fontSize: "13px", marginBottom: "6px" };
+const labelStyle = { display: "block", color: "var(--c-text-2)", fontSize: "13px", marginBottom: "6px" };
 
 // Static lookup built once at module load time
 const TMPL_META = {};
@@ -233,14 +233,14 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50, padding: "16px" }}>
-      <div style={{ background: "#1e293b", borderRadius: "12px", padding: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", maxHeight: "90vh", overflowY: "auto" }}>
+      <div style={{ background: "var(--c-surface)", borderRadius: "12px", padding: "32px", width: "100%", maxWidth: "500px", boxShadow: "0 4px 24px rgba(0,0,0,0.4)", maxHeight: "90vh", overflowY: "auto" }}>
 
-        <h2 style={{ color: "#f1f5f9", margin: "0 0 24px", fontSize: "20px", fontFamily: "Manrope, sans-serif" }}>
+        <h2 style={{ color: "var(--c-text)", margin: "0 0 24px", fontSize: "20px", fontFamily: "Manrope, sans-serif" }}>
           Create New Project
         </h2>
 
         {error && (
-          <div style={{ background: "#450a0a", border: "1px solid #ef4444", borderRadius: "8px", padding: "12px", marginBottom: "16px", color: "#fca5a5", fontSize: "14px" }}>
+          <div style={{ background: "var(--c-err-bg)", border: "1px solid #ef4444", borderRadius: "8px", padding: "12px", marginBottom: "16px", color: "var(--c-err-text)", fontSize: "14px" }}>
             {error}
           </div>
         )}
@@ -249,14 +249,14 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
         {loading && (
           <div style={{ marginBottom: "20px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px" }}>
-              <span style={{ color: "#33bdef", fontSize: "13px", fontFamily: "Manrope, sans-serif" }}>{progressStep}</span>
-              <span style={{ color: "#64748b", fontSize: "12px", fontFamily: "Manrope, sans-serif" }}>{progressPct}%</span>
+              <span style={{ color: "var(--c-accent-lt)", fontSize: "13px", fontFamily: "Manrope, sans-serif" }}>{progressStep}</span>
+              <span style={{ color: "var(--c-text-3)", fontSize: "12px", fontFamily: "Manrope, sans-serif" }}>{progressPct}%</span>
             </div>
-            <div style={{ height: "6px", background: "#0f172a", borderRadius: "3px", overflow: "hidden", border: "1px solid #1e293b" }}>
+            <div style={{ height: "6px", background: "var(--c-bg)", borderRadius: "3px", overflow: "hidden", border: "1px solid #1e293b" }}>
               <div style={{
                 height: "100%",
                 width: `${progressPct}%`,
-                background: progressPct === 100 ? "#4da447" : "#0095da",
+                background: progressPct === 100 ? "var(--c-ok)" : "var(--c-accent)",
                 borderRadius: "3px",
                 transition: "width 0.35s ease, background 0.2s",
               }} />
@@ -279,17 +279,17 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
           </div>
 
           {/* Template toggle */}
-          <div style={{ marginBottom: "20px", background: "#0f172a", borderRadius: "8px", padding: "14px", border: "1px solid #334155" }}>
+          <div style={{ marginBottom: "20px", background: "var(--c-bg)", borderRadius: "8px", padding: "14px", border: "1px solid #334155" }}>
             <label style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
               <input type="checkbox" checked={useTemplate} onChange={(e) => setUseTemplate(e.target.checked)}
                 disabled={loading || pmProjects.length === 0}
-                style={{ width: "16px", height: "16px", accentColor: "#0095da" }} />
-              <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "500" }}>
+                style={{ width: "16px", height: "16px", accentColor: "var(--c-accent)" }} />
+              <span style={{ color: "var(--c-text)", fontSize: "14px", fontWeight: "500" }}>
                 Use an existing project as template
               </span>
             </label>
             {pmProjects.length === 0 && (
-              <p style={{ color: "#64748b", fontSize: "12px", margin: "8px 0 0 26px" }}>
+              <p style={{ color: "var(--c-text-3)", fontSize: "12px", margin: "8px 0 0 26px" }}>
                 No existing projects to use as template.
               </p>
             )}
@@ -303,7 +303,7 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
-                <p style={{ color: "#64748b", fontSize: "11px", margin: "8px 0 0" }}>
+                <p style={{ color: "var(--c-text-3)", fontSize: "11px", margin: "8px 0 0" }}>
                   Copies checklist config, custom items, and milestones. Members are not copied.
                 </p>
               </div>
@@ -312,12 +312,12 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
 
           <div style={{ display: "flex", gap: "12px" }}>
             <button type="button" onClick={onClose} disabled={loading}
-              style={{ flex: 1, padding: "12px", background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", fontFamily: "Manrope, sans-serif" }}>
+              style={{ flex: 1, padding: "12px", background: "var(--c-border)", color: "var(--c-text)", border: "none", borderRadius: "8px", fontSize: "14px", cursor: loading ? "not-allowed" : "pointer", fontFamily: "Manrope, sans-serif" }}>
               Cancel
             </button>
             <button type="submit" disabled={loading || (useTemplate && !templateProjectId)}
               style={{
-                flex: 1, padding: "12px", background: "#0095da", color: "white", border: "none",
+                flex: 1, padding: "12px", background: "var(--c-accent)", color: "white", border: "none",
                 borderRadius: "8px", fontSize: "14px", fontWeight: "600", fontFamily: "Manrope, sans-serif",
                 cursor: (loading || (useTemplate && !templateProjectId)) ? "not-allowed" : "pointer",
                 opacity: (loading || (useTemplate && !templateProjectId)) ? 0.7 : 1,
