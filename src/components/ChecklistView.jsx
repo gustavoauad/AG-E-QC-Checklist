@@ -43,6 +43,8 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     return () => supabase.removeChannel(ch);
   }, [project.id]);
 
+  const [itemMsMap, setItemMsMap] = useState({}); // itemId → [milestoneName, ...]
+
   const fetchAll = async () => {
     setLoading(true);
     const [checklistRes, configRes, memberRes, milestoneRes] = await Promise.all([
@@ -57,7 +59,20 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     setCategoryConfig(cfgMap);
     const ms = milestoneRes.data || [];
     setMilestones(ms);
-    if (ms.length > 0) setActiveMilestoneId(ms[0].id);
+    if (ms.length > 0) {
+      setActiveMilestoneId(ms[0].id);
+      // Build itemId → [milestoneName] map for display
+      const msIds = ms.map((m) => m.id);
+      const { data: miData } = await supabase.from("milestone_items")
+        .select("milestone_id, checklist_item_id").in("milestone_id", msIds);
+      const imMap = {};
+      (miData || []).forEach(({ milestone_id, checklist_item_id }) => {
+        if (!imMap[checklist_item_id]) imMap[checklist_item_id] = [];
+        const msName = ms.find((m) => m.id === milestone_id)?.name;
+        if (msName) imMap[checklist_item_id].push(msName);
+      });
+      setItemMsMap(imMap);
+    }
     const userIds = (memberRes.data || []).map((r) => r.user_id);
     if (userIds.length > 0) {
       const { data: profiles } = await supabase.from("profiles").select("id, full_name").in("id", userIds);
@@ -286,6 +301,16 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               <p style={{ margin: "4px 0 0", fontSize: "11px", color: "#7ecb7b" }}>
                 ✓ {completedByName} · {formatDate(item.completed_at)}
               </p>
+            )}
+            {milestones.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "5px" }}>
+                {(itemMsMap[item.id] || []).length > 0
+                  ? (itemMsMap[item.id] || []).map((name) => (
+                      <span key={name} style={{ fontSize: "10px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "3px", padding: "1px 6px" }}>{name}</span>
+                    ))
+                  : <span style={{ fontSize: "10px", color: "#ef4444", background: "#2d0a0a", border: "1px solid #7f1d1d", borderRadius: "3px", padding: "1px 6px" }}>⚠ no milestone</span>
+                }
+              </div>
             )}
           </div>
 

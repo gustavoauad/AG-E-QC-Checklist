@@ -667,11 +667,6 @@ function MilestonesTab({ project }) {
   const [editDate, setEditDate] = useState("");
   const [editDaysAlert, setEditDaysAlert] = useState(7);
   const [editSaving, setEditSaving] = useState(false);
-  // assignment panel state
-  const [assigningId, setAssigningId] = useState(null);
-  const [projectItems, setProjectItems] = useState([]);
-  const [assignedSets, setAssignedSets] = useState({}); // milestoneId -> Set<itemId>
-  const [assignLoading, setAssignLoading] = useState(false);
 
   useEffect(() => { loadMilestones(); }, []);
 
@@ -698,7 +693,6 @@ function MilestonesTab({ project }) {
 
   const startEdit = (m) => {
     setEditingId(m.id); setEditName(m.name); setEditDate(m.date); setEditDaysAlert(m.days_before_alert);
-    setAssigningId(null);
   };
   const cancelEdit = () => setEditingId(null);
 
@@ -712,77 +706,19 @@ function MilestonesTab({ project }) {
   };
 
   const remove = async (id) => {
-    if (!window.confirm("Delete this milestone and all its item assignments?")) return;
+    if (!window.confirm("Delete this milestone?")) return;
     const { error: err } = await supabase.from("project_milestones").delete().eq("id", id);
     if (err) { setError("Could not delete: " + err.message); return; }
     setMilestones((prev) => prev.filter((m) => m.id !== id));
-    if (assigningId === id) setAssigningId(null);
-  };
-
-  // ── Assignment panel ──────────────────────────────────────────────────────
-  const openAssign = async (milestoneId) => {
-    if (assigningId === milestoneId) { setAssigningId(null); return; }
-    setEditingId(null);
-    setAssigningId(milestoneId);
-    setAssignLoading(true);
-
-    // Load all project checklist items once
-    let items = projectItems;
-    if (items.length === 0) {
-      const { data } = await supabase.from("checklists")
-        .select("id, category, sub_section, item_text, phase").eq("project_id", project.id).order("category").order("item_id");
-      items = data || [];
-      setProjectItems(items);
-    }
-
-    // Load assigned items for this milestone
-    if (!assignedSets[milestoneId]) {
-      const { data } = await supabase.from("milestone_items")
-        .select("checklist_item_id").eq("milestone_id", milestoneId);
-      const ids = new Set((data || []).map((r) => r.checklist_item_id));
-      setAssignedSets((prev) => ({ ...prev, [milestoneId]: ids }));
-    }
-
-    setAssignLoading(false);
-  };
-
-  const toggleItem = async (milestoneId, itemId, add) => {
-    // Optimistic update
-    setAssignedSets((prev) => {
-      const next = new Set(prev[milestoneId] || []);
-      add ? next.add(itemId) : next.delete(itemId);
-      return { ...prev, [milestoneId]: next };
-    });
-
-    if (add) {
-      await supabase.from("milestone_items").insert({ milestone_id: milestoneId, checklist_item_id: itemId });
-    } else {
-      await supabase.from("milestone_items").delete()
-        .eq("milestone_id", milestoneId).eq("checklist_item_id", itemId);
-    }
-  };
-
-  const selectAllInCategory = async (milestoneId, catItems, addAll) => {
-    for (const item of catItems) {
-      const already = assignedSets[milestoneId]?.has(item.id) ?? false;
-      if (addAll && !already) await toggleItem(milestoneId, item.id, true);
-      if (!addAll && already) await toggleItem(milestoneId, item.id, false);
-    }
   };
 
   const getDaysUntil = (dateStr) =>
     Math.ceil((new Date(dateStr + "T00:00:00") - new Date()) / (1000 * 60 * 60 * 24));
 
-  const groupedItems = CATEGORIES.reduce((acc, cat) => {
-    const items = projectItems.filter((i) => i.category === cat.id);
-    if (items.length) acc[cat.id] = { label: cat.label, items };
-    return acc;
-  }, {});
-
   return (
     <div>
       <p style={{ color: "#94a3b8", fontSize: "14px", marginTop: 0 }}>
-        Define milestones, set alert windows, and assign which checklist items belong to each milestone.
+        Define milestones and alert windows. Assign checklist items to milestones from the Checklists tab.
       </p>
 
       {error && (
@@ -828,9 +764,6 @@ function MilestonesTab({ project }) {
             const isAlert = d >= 0 && d <= m.days_before_alert;
             const isPast = d < 0;
             const isEditing = editingId === m.id;
-            const isAssigning = assigningId === m.id;
-            const assigned = assignedSets[m.id];
-            const assignedCount = assigned?.size ?? "—";
 
             if (isEditing) {
               return (
@@ -862,99 +795,26 @@ function MilestonesTab({ project }) {
             }
 
             return (
-              <div key={m.id}>
-                {/* Milestone row */}
-                <div style={{
-                  display: "flex", justifyContent: "space-between", alignItems: "center",
-                  padding: "12px 16px", background: "#0f172a", borderRadius: isAssigning ? "8px 8px 0 0" : "8px",
-                  border: `1px solid ${isAssigning ? "#0095da" : isAlert ? "#f59e0b" : "#334155"}`,
-                  borderBottom: isAssigning ? "none" : undefined,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                    <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
-                    <span style={{ color: "#94a3b8", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
-                    <span style={{ color: "#64748b", fontSize: "12px" }}>alert {m.days_before_alert}d before</span>
-                    {assigned !== undefined && (
-                      <span style={{ fontSize: "11px", color: "#33bdef", background: "#012d5a", padding: "2px 8px", borderRadius: "20px" }}>
-                        {assignedCount} items
-                      </span>
-                    )}
-                    {isAlert && <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "2px 8px", borderRadius: "20px" }}>⚠ {d}d remaining</span>}
-                    {isPast && <span style={{ fontSize: "11px", color: "#64748b" }}>Past</span>}
-                  </div>
-                  <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                    <button onClick={() => openAssign(m.id)} style={{
-                      padding: "5px 12px", background: isAssigning ? "#012d5a" : "transparent",
-                      color: isAssigning ? "#33bdef" : "#94a3b8",
-                      border: `1px solid ${isAssigning ? "#0095da" : "#334155"}`,
-                      borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600",
-                    }}>
-                      {isAssigning ? "▲ Assign Items" : "▼ Assign Items"}
-                    </button>
-                    <button onClick={() => startEdit(m)} style={{ padding: "5px 12px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
-                      Edit
-                    </button>
-                    <button onClick={() => remove(m.id)} style={{ padding: "5px 12px", background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
-                      Delete
-                    </button>
-                  </div>
+              <div key={m.id} style={{
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "12px 16px", background: "#0f172a", borderRadius: "8px",
+                border: `1px solid ${isAlert ? "#f59e0b" : "#334155"}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                  <span style={{ color: "#f1f5f9", fontSize: "14px", fontWeight: "600" }}>{m.name}</span>
+                  <span style={{ color: "#94a3b8", fontSize: "13px" }}>{new Date(m.date + "T00:00:00").toLocaleDateString()}</span>
+                  <span style={{ color: "#64748b", fontSize: "12px" }}>alert {m.days_before_alert}d before</span>
+                  {isAlert && <span style={{ fontSize: "11px", color: "#f59e0b", background: "#451a03", padding: "2px 8px", borderRadius: "20px" }}>⚠ {d}d remaining</span>}
+                  {isPast && <span style={{ fontSize: "11px", color: "#64748b" }}>Past</span>}
                 </div>
-
-                {/* Assignment panel */}
-                {isAssigning && (
-                  <div style={{ border: "1px solid #0095da", borderTop: "none", borderRadius: "0 0 8px 8px", background: "#060f1e", padding: "16px", maxHeight: "420px", overflowY: "auto" }}>
-                    {assignLoading ? (
-                      <p style={{ color: "#94a3b8", fontSize: "13px" }}>Loading items...</p>
-                    ) : (
-                      Object.entries(groupedItems).map(([catId, { label, items }]) => {
-                        const catAssigned = items.filter((i) => assignedSets[m.id]?.has(i.id));
-                        const allSelected = catAssigned.length === items.length;
-                        return (
-                          <div key={catId} style={{ marginBottom: "16px" }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "6px", paddingBottom: "4px", borderBottom: "1px solid #1e293b" }}>
-                              <span style={{ color: "#33bdef", fontSize: "12px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                {label}
-                                <span style={{ color: "#334155", fontWeight: "400", marginLeft: "6px" }}>({catAssigned.length}/{items.length})</span>
-                              </span>
-                              <button
-                                onClick={() => selectAllInCategory(m.id, items, !allSelected)}
-                                style={{ fontSize: "11px", color: allSelected ? "#64748b" : "#0095da", background: "none", border: "none", cursor: "pointer", fontWeight: "600" }}>
-                                {allSelected ? "Deselect All" : "Select All"}
-                              </button>
-                            </div>
-                            <div style={{ display: "grid", gap: "2px" }}>
-                              {items.map((item) => {
-                                const checked = assignedSets[m.id]?.has(item.id) ?? false;
-                                return (
-                                  <label key={item.id} style={{
-                                    display: "flex", alignItems: "flex-start", gap: "8px", cursor: "pointer",
-                                    padding: "5px 8px", borderRadius: "5px",
-                                    background: checked ? "#0f2744" : "transparent",
-                                  }}>
-                                    <input
-                                      type="checkbox"
-                                      checked={checked}
-                                      onChange={(e) => toggleItem(m.id, item.id, e.target.checked)}
-                                      style={{ marginTop: "3px", flexShrink: 0, accentColor: "#0095da" }}
-                                    />
-                                    <span style={{ color: checked ? "#f1f5f9" : "#94a3b8", fontSize: "13px", lineHeight: "1.45", flex: 1 }}>
-                                      {item.item_text}
-                                    </span>
-                                    {item.phase && (
-                                      <span style={{ fontSize: "10px", color: "#0095da", background: "#012d5a", padding: "1px 6px", borderRadius: "4px", flexShrink: 0, alignSelf: "center" }}>
-                                        {item.phase}
-                                      </span>
-                                    )}
-                                  </label>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
+                  <button onClick={() => startEdit(m)} style={{ padding: "5px 12px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                    Edit
+                  </button>
+                  <button onClick={() => remove(m.id)} style={{ padding: "5px 12px", background: "transparent", color: "#ef4444", border: "1px solid #ef4444", borderRadius: "6px", cursor: "pointer", fontSize: "12px", fontWeight: "600" }}>
+                    Delete
+                  </button>
+                </div>
               </div>
             );
           })}
