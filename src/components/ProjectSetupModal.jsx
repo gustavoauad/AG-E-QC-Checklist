@@ -59,15 +59,27 @@ function ChecklistsTab({ project, userRole }) {
   const [renameCatText, setRenameCatText] = useState("");
   const dragInfo = useRef(null);
   const [dragOver, setDragOver] = useState(null);
+  const [milestones, setMilestones] = useState([]);
+  // itemMilestones: itemId → Set<milestoneId>
+  const [itemMilestones, setItemMilestones] = useState({});
+  // milestonePickerOpen: itemId | `sec:catId:label` | `cat:catId` | null
+  const [milestonePickerOpen, setMilestonePickerOpen] = useState(null);
 
   useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    if (!milestonePickerOpen) return;
+    const close = () => setMilestonePickerOpen(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [milestonePickerOpen]);
 
   const loadAll = async () => {
     setLoading(true);
-    const [cfgRes, itemsRes] = await Promise.all([
+    const [cfgRes, itemsRes, msRes] = await Promise.all([
       supabase.from("project_checklist_config").select("*").eq("project_id", project.id),
       supabase.from("checklists").select("*").eq("project_id", project.id)
         .order("category").order("sort_order", { nullsFirst: false }).order("item_id"),
+      supabase.from("project_milestones").select("*").eq("project_id", project.id).order("date"),
     ]);
     const cfgMap = {};
     (cfgRes.data || []).forEach((r) => { cfgMap[r.category] = { enabled: r.enabled, label: r.label, is_custom: r.is_custom }; });
@@ -81,6 +93,21 @@ function ChecklistsTab({ project, userRole }) {
     const sectionMap = {};
     Object.entries(itemMap).forEach(([catId, catItems]) => { sectionMap[catId] = deriveSections(catItems); });
     setSections(sectionMap);
+    const ms = msRes.data || [];
+    setMilestones(ms);
+    // Load all milestone_items for this project in one query
+    if (ms.length > 0) {
+      const msIds = ms.map((m) => m.id);
+      const { data: miData } = await supabase.from("milestone_items")
+        .select("milestone_id, checklist_item_id")
+        .in("milestone_id", msIds);
+      const imMap = {};
+      (miData || []).forEach(({ milestone_id, checklist_item_id }) => {
+        if (!imMap[checklist_item_id]) imMap[checklist_item_id] = new Set();
+        imMap[checklist_item_id].add(milestone_id);
+      });
+      setItemMilestones(imMap);
+    }
     setLoading(false);
   };
 
@@ -190,6 +217,55 @@ function ChecklistsTab({ project, userRole }) {
     if (ids.length) await supabase.from("checklists").update({ sub_section: null }).in("id", ids);
     setItems((p) => ({ ...p, [catId]: (p[catId] || []).map((i) => i.sub_section === label ? { ...i, sub_section: null } : i) }));
     setSections((p) => ({ ...p, [catId]: (p[catId] || []).filter((s) => s !== label) }));
+  };
+
+  const toggleItemMilestone = async (itemId, milestoneId, add) => {
+    setItemMilestones((prev) => {
+      const next = { ...prev };
+      if (!next[itemId]) next[itemId] = new Set();
+      else next[itemId] = new Set(next[itemId]);
+      add ? next[itemId].add(milestoneId) : next[itemId].delete(milestoneId);
+      return next;
+    });
+    if (add) {
+      await supabase.from("milestone_items").insert({ milestone_id: milestoneId, checklist_item_id: itemId });
+    } else {
+      await supabase.from("milestone_items").delete()
+        .eq("milestone_id", milestoneId).eq("checklist_item_id", itemId);
+    }
+  };
+
+  const bulkToggleMilestone = async (itemIds, milestoneId, add) => {
+    for (const itemId of itemIds) {
+      const has = itemMilestones[itemId]?.has(milestoneId) ?? false;
+      if (add && !has) await toggleItemMilestone(itemId, milestoneId, true);
+      if (!add && has) await toggleItemMilestone(itemId, milestoneId, false);
+    }
+  };
+
+  const MilestonePicker = ({ anchorKey, itemIds }) => {
+    if (milestonePickerOpen !== anchorKey || milestones.length === 0) return null;
+    const allAssigned = milestones.map((m) => ({
+      ...m,
+      assigned: itemIds.every((id) => itemMilestones[id]?.has(m.id)),
+      partial: itemIds.some((id) => itemMilestones[id]?.has(m.id)) && !itemIds.every((id) => itemMilestones[id]?.has(m.id)),
+    }));
+    return (
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", zIndex: 100, background: "#1e293b", border: "1px solid #0095da", borderRadius: "8px", padding: "8px", minWidth: "180px", boxShadow: "0 4px 16px rgba(0,0,0,0.5)", right: 0, top: "100%", marginTop: "4px" }}>
+        <p style={{ color: "#64748b", fontSize: "10px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 6px 4px" }}>Assign to milestone</p>
+        {allAssigned.map((m) => (
+          <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "5px 6px", borderRadius: "5px", cursor: "pointer", color: m.assigned ? "#7dd3fc" : m.partial ? "#f59e0b" : "#94a3b8", fontSize: "12px" }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#0f172a"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+            <input type="checkbox" checked={m.assigned} ref={(el) => { if (el) el.indeterminate = m.partial; }}
+              onChange={(e) => bulkToggleMilestone(itemIds, m.id, e.target.checked)}
+              style={{ accentColor: "#0095da", flexShrink: 0 }} />
+            <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+          </label>
+        ))}
+        <button onClick={() => setMilestonePickerOpen(null)} style={{ width: "100%", marginTop: "6px", padding: "4px", background: "transparent", border: "1px solid #334155", borderRadius: "5px", color: "#64748b", fontSize: "11px", cursor: "pointer" }}>Close</button>
+      </div>
+    );
   };
 
   const handleDragEnd = () => { dragInfo.current = null; setDragOver(null); };
@@ -326,7 +402,16 @@ function ChecklistsTab({ project, userRole }) {
                   )}
                 </div>
                 {canEdit && !isRenamingThis && (
-                  <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: "5px", flexShrink: 0, alignItems: "center" }}>
+                    {milestones.length > 0 && (() => {
+                      const catKey = `cat:${cat.id}`;
+                      return (
+                        <div style={{ position: "relative" }}>
+                          <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === catKey ? null : catKey); }} style={{ ...mBtn(), fontSize: "10px", color: "#0095da", borderColor: "#0095da" }}>+ms all</button>
+                          <MilestonePicker anchorKey={catKey} itemIds={catItems.map((i) => i.id)} />
+                        </div>
+                      );
+                    })()}
                     <button onClick={() => { setRenamingCat(cat.id); setRenameCatText(getLabel(cat)); }} style={mBtn()}>Rename</button>
                     {cat.isCustom && <button onClick={() => deleteCustomCat(cat.id)} style={mBtn({ color: "#ef4444" })}>x</button>}
                   </div>
@@ -367,6 +452,16 @@ function ChecklistsTab({ project, userRole }) {
                             <>
                               <span style={{ flex: 1, color: "#7dd3fc", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>{sLabel}</span>
                               {isSectionDT && <span style={{ color: "#f59e0b", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>}
+                              {canEdit && milestones.length > 0 && (() => {
+                                const secItemIds = catItems.filter((i) => i.sub_section === sLabel).map((i) => i.id);
+                                const secKey = `sec:${cat.id}:${sLabel}`;
+                                return (
+                                  <div style={{ position: "relative", flexShrink: 0 }}>
+                                    <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === secKey ? null : secKey); }} style={{ ...mBtn(), fontSize: "10px", color: "#0095da", borderColor: "#0095da" }}>+ms section</button>
+                                    <MilestonePicker anchorKey={secKey} itemIds={secItemIds} />
+                                  </div>
+                                );
+                              })()}
                               {canEdit && (
                                 <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                   <button onClick={() => { setRenamingSection({ catId: cat.id, label: sLabel }); setRenameSectionText(sLabel); }} style={mBtn()}>Rename</button>
@@ -400,6 +495,16 @@ function ChecklistsTab({ project, userRole }) {
                                     {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
                                     {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
                                   </span>
+                                )}
+                                {milestones.length > 0 && (
+                                  <div style={{ position: "relative", flexShrink: 0, display: "flex", alignItems: "center", gap: "3px" }}>
+                                    {[...(itemMilestones[item.id] || [])].map((msId) => {
+                                      const ms = milestones.find((m) => m.id === msId);
+                                      return ms ? <span key={msId} style={{ fontSize: "9px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "3px", padding: "1px 4px", whiteSpace: "nowrap", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis" }}>{ms.name}</span> : null;
+                                    })}
+                                    {canEdit && <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === item.id ? null : item.id); }} style={{ ...mBtn(), padding: "1px 5px", fontSize: "10px", color: "#0095da", borderColor: "#0095da" }}>+ms</button>}
+                                    <MilestonePicker anchorKey={item.id} itemIds={[item.id]} />
+                                  </div>
                                 )}
                                 {canEdit && (
                                   <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
@@ -470,6 +575,16 @@ function ChecklistsTab({ project, userRole }) {
                                         {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
                                         {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
                                       </span>
+                                    )}
+                                    {milestones.length > 0 && (
+                                      <div style={{ position: "relative", flexShrink: 0, display: "flex", alignItems: "center", gap: "3px" }}>
+                                        {[...(itemMilestones[item.id] || [])].map((msId) => {
+                                          const ms = milestones.find((m) => m.id === msId);
+                                          return ms ? <span key={msId} style={{ fontSize: "9px", background: "#012d5a", color: "#33bdef", border: "1px solid #0095da", borderRadius: "3px", padding: "1px 4px", whiteSpace: "nowrap", maxWidth: "60px", overflow: "hidden", textOverflow: "ellipsis" }}>{ms.name}</span> : null;
+                                        })}
+                                        {canEdit && <button onClick={(e) => { e.stopPropagation(); setMilestonePickerOpen(milestonePickerOpen === item.id ? null : item.id); }} style={{ ...mBtn(), padding: "1px 5px", fontSize: "10px", color: "#0095da", borderColor: "#0095da" }}>+ms</button>}
+                                        <MilestonePicker anchorKey={item.id} itemIds={[item.id]} />
+                                      </div>
                                     )}
                                     {canEdit && (
                                       <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>

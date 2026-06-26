@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
-import { CATEGORIES, CHECKLIST_TEMPLATE } from "../checklistTemplate";
+import { CATEGORIES } from "../checklistTemplate";
 import { useIsMobile } from "../useIsMobile";
 import AgeLogo from "./AgeLogo";
 import NotificationBell from "./NotificationBell";
@@ -23,7 +23,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const [milestoneItemsCache, setMilestoneItemsCache] = useState({});
   const [milestoneLoading, setMilestoneLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all"); // all | pending | complete | na
-  const [filterPhase, setFilterPhase] = useState("all");   // all | SD | DD | CD
+  const [filterMilestoneId, setFilterMilestoneId] = useState("all");
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -82,6 +82,11 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const switchToMilestone = async (milestoneId) => {
     setActiveMilestoneId(milestoneId);
     await fetchMilestoneItems(milestoneId);
+  };
+
+  const setFilterMilestone = async (milestoneId) => {
+    setFilterMilestoneId(milestoneId);
+    if (milestoneId !== "all") await fetchMilestoneItems(milestoneId);
   };
 
   const handleViewModeToggle = async (mode) => {
@@ -197,13 +202,11 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     ? new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : "";
 
-  // Phase lookup from template (item_id → phase)
-  const phaseMap = {};
-  CHECKLIST_TEMPLATE.forEach((t) => { if (t.phase) phaseMap[t.item_id] = t.phase; });
+  const filterMilestoneSet = filterMilestoneId !== "all" ? (milestoneItemsCache[filterMilestoneId] || null) : null;
 
   const applyFilters = (items) => items.filter((item) => {
     if (filterStatus !== "all" && (item.status || "pending") !== filterStatus) return false;
-    if (filterPhase !== "all" && phaseMap[item.item_id] !== filterPhase) return false;
+    if (filterMilestoneSet && !filterMilestoneSet.has(item.id)) return false;
     return true;
   });
 
@@ -450,20 +453,27 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
       <div style={{ background: "#0f172a", borderBottom: "1px solid #243044", padding: isMobile ? "8px 12px" : "8px 20px", display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
         <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.05em", marginRight: "4px" }}>Filter:</span>
 
-        {/* Phase filter */}
-        {["all", "SD", "DD", "CD"].map((p) => (
-          <button key={p} onClick={() => setFilterPhase(p)} style={{
+        {/* Milestone filter */}
+        {milestones.length > 0 && (<>
+          <button onClick={() => setFilterMilestone("all")} style={{
             padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
             fontSize: "12px", fontWeight: "600", cursor: "pointer",
-            background: filterPhase === p ? "#012d5a" : "transparent",
-            borderColor: filterPhase === p ? "#0095da" : "#334155",
-            color: filterPhase === p ? "#33bdef" : "#64748b",
-          }}>
-            {p === "all" ? "All Phases" : p}
-          </button>
-        ))}
-
-        <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+            background: filterMilestoneId === "all" ? "#012d5a" : "transparent",
+            borderColor: filterMilestoneId === "all" ? "#0095da" : "#334155",
+            color: filterMilestoneId === "all" ? "#33bdef" : "#64748b",
+          }}>All Milestones</button>
+          {milestones.map((m) => (
+            <button key={m.id} onClick={() => setFilterMilestone(m.id)} style={{
+              padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
+              fontSize: "12px", fontWeight: "600", cursor: "pointer",
+              background: filterMilestoneId === m.id ? "#012d5a" : "transparent",
+              borderColor: filterMilestoneId === m.id ? "#0095da" : "#334155",
+              color: filterMilestoneId === m.id ? "#33bdef" : "#64748b",
+              maxWidth: isMobile ? "120px" : "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            }}>{m.name}</button>
+          ))}
+          <div style={{ width: "1px", height: "16px", background: "#334155", margin: "0 4px" }} />
+        </>)}
 
         {/* Status filter */}
         {[
@@ -484,8 +494,8 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
         ))}
 
         {/* Clear filters */}
-        {(filterPhase !== "all" || filterStatus !== "all") && (
-          <button onClick={() => { setFilterPhase("all"); setFilterStatus("all"); }} style={{
+        {(filterMilestoneId !== "all" || filterStatus !== "all") && (
+          <button onClick={() => { setFilterMilestoneId("all"); setFilterStatus("all"); }} style={{
             padding: "4px 10px", borderRadius: "20px", border: "1px solid #ef4444",
             fontSize: "11px", fontWeight: "600", cursor: "pointer",
             background: "transparent", color: "#ef4444", marginLeft: "4px",
