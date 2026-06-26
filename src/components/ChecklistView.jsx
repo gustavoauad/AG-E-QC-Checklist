@@ -273,7 +273,10 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             }}>
               {item.item_text}
               {item.is_custom && (
-                <span style={{ marginLeft: "8px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 6px", borderRadius: "4px" }}>custom</span>
+                <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 6px", borderRadius: "4px" }}>custom</span>
+              )}
+              {item.edited_by_pm && (
+                <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 6px", borderRadius: "4px" }}>✏ edited</span>
               )}
             </p>
             {status === "complete" && completedByName && (

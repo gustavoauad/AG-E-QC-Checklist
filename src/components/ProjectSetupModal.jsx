@@ -104,9 +104,9 @@ function ChecklistsTab({ project }) {
   const saveEdits = async () => {
     setSavingEdits(true);
     for (const [id, text] of Object.entries(localEdits)) {
-      await supabase.from("checklists").update({ item_text: text }).eq("id", id);
+      await supabase.from("checklists").update({ item_text: text, edited_by_pm: true }).eq("id", id);
     }
-    setItems((prev) => prev.map((i) => localEdits[i.id] ? { ...i, item_text: localEdits[i.id] } : i));
+    setItems((prev) => prev.map((i) => localEdits[i.id] ? { ...i, item_text: localEdits[i.id], edited_by_pm: true } : i));
     setLocalEdits({});
     setSavingEdits(false);
   };
@@ -208,12 +208,22 @@ function ChecklistsTab({ project }) {
                         {catItems.map((item, idx) => (
                           <div key={item.id} style={{ display: "flex", gap: "8px", alignItems: "flex-start" }}>
                             <span style={{ color: "#64748b", fontSize: "11px", paddingTop: "10px", flexShrink: 0, minWidth: "22px", textAlign: "right" }}>{idx + 1}.</span>
-                            <textarea
-                              value={localEdits[item.id] ?? item.item_text}
-                              onChange={(e) => setLocalEdits((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                              rows={2}
-                              style={{ ...inputStyle, fontSize: "13px", resize: "vertical", borderColor: localEdits[item.id] !== undefined ? "#0095da" : "#334155" }}
-                            />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: "flex", gap: "5px", marginBottom: "4px", flexWrap: "wrap" }}>
+                                {item.edited_by_pm && localEdits[item.id] === undefined && (
+                                  <span style={{ fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 7px", borderRadius: "4px", fontWeight: "600" }}>✏ PM edited</span>
+                                )}
+                                {item.is_custom && (
+                                  <span style={{ fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 7px", borderRadius: "4px", fontWeight: "600" }}>custom</span>
+                                )}
+                              </div>
+                              <textarea
+                                value={localEdits[item.id] ?? item.item_text}
+                                onChange={(e) => setLocalEdits((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                rows={2}
+                                style={{ ...inputStyle, fontSize: "13px", resize: "vertical", borderColor: localEdits[item.id] !== undefined ? "#0095da" : item.edited_by_pm ? "#78350f" : "#334155" }}
+                              />
+                            </div>
                           </div>
                         ))}
                       </div>

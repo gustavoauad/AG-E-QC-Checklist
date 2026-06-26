@@ -253,6 +253,76 @@ function ChecklistsTab({ org, orgRole }) {
     setLoading(false);
   };
 
+  // ── Push to project ─────────────────────────────────────────────────────────
+  const [pushModal, setPushModal] = useState(null); // { catId, catLabel }
+  const [orgProjects, setOrgProjects] = useState([]);
+  const [pushProjectId, setPushProjectId] = useState("");
+  const [pushStatus, setPushStatus] = useState("idle"); // idle|checking|conflict|pushing|done
+
+  const openPushModal = async (cat) => {
+    setPushModal({ catId: cat.id, catLabel: getLabel(cat) });
+    setPushStatus("idle"); setPushProjectId("");
+    if (!orgProjects.length) {
+      const { data } = await supabase.from("projects")
+        .select("id, name").eq("organization_id", org.id).is("archived_at", null).order("name");
+      setOrgProjects(data || []);
+    }
+  };
+
+  const executePush = async (action) => {
+    setPushStatus("pushing");
+    const { catId, catLabel } = pushModal;
+    // Ensure items are loaded
+    const catItems = items[catId] !== undefined ? items[catId] : await initCategory(catId);
+
+    if (action === "overwrite") {
+      await supabase.from("checklists").delete().eq("project_id", pushProjectId).eq("category", catId);
+      if (catItems.length) {
+        await supabase.from("checklists").insert(
+          catItems.map((item) => ({
+            project_id: pushProjectId, item_id: item.item_id, category: catId,
+            item_text: item.item_text, sort_order: item.sort_order, status: "pending",
+          }))
+        );
+      }
+      await supabase.from("project_checklist_config").upsert(
+        { project_id: pushProjectId, category: catId, enabled: true, label: catLabel },
+        { onConflict: "project_id,category" }
+      );
+    } else if (action === "new") {
+      const ts = Date.now().toString(36);
+      const newCatId = `${catId.slice(0, 8)}_copy_${ts}`;
+      const newLabel = `${catLabel} (Copy)`;
+      if (catItems.length) {
+        await supabase.from("checklists").insert(
+          catItems.map((item) => ({
+            project_id: pushProjectId,
+            item_id: `${newCatId}_${item.item_id.slice(-8)}`,
+            category: newCatId, item_text: item.item_text,
+            sort_order: item.sort_order, status: "pending", is_custom: true,
+          }))
+        );
+      }
+      await supabase.from("project_checklist_config").upsert(
+        { project_id: pushProjectId, category: newCatId, enabled: true, label: newLabel },
+        { onConflict: "project_id,category" }
+      );
+    }
+    setPushStatus("done");
+  };
+
+  const checkAndPush = async () => {
+    if (!pushProjectId) return;
+    setPushStatus("checking");
+    const { data: existing } = await supabase.from("checklists")
+      .select("id").eq("project_id", pushProjectId).eq("category", pushModal.catId).limit(1);
+    if (existing?.length) {
+      setPushStatus("conflict");
+    } else {
+      await executePush("overwrite");
+    }
+  };
+
   const addCustomCategory = async () => {
     if (!newCatName.trim()) return;
     setSavingCat(true);
@@ -467,6 +537,12 @@ function ChecklistsTab({ org, orgRole }) {
                 {/* Actions */}
                 {orgRole === "admin" && !isRenamingThis && (
                   <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
+                    <button onClick={() => openPushModal(cat)} style={{
+                      padding: "3px 8px", background: "transparent", border: "1px solid #29439b",
+                      color: "#818cf8", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
+                    }} title="Push this checklist to a specific project">
+                      ↗ Push
+                    </button>
                     <button onClick={() => { setRenamingCat(cat.id); setRenameText(getLabel(cat)); }} style={{
                       padding: "3px 8px", background: "transparent", border: "1px solid #334155",
                       color: "#64748b", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
@@ -577,6 +653,77 @@ function ChecklistsTab({ org, orgRole }) {
           );
         })}
       </div>
+
+      {/* Push to Project modal */}
+      {pushModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.75)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: "16px" }}>
+          <div style={{ background: "#1e293b", borderRadius: "12px", padding: "28px", width: "100%", maxWidth: "440px", border: "1px solid #334155", boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }}>
+            <h3 style={{ color: "#f1f5f9", margin: "0 0 6px", fontSize: "16px", fontFamily: "Manrope, sans-serif" }}>Push to Project</h3>
+            <p style={{ color: "#64748b", fontSize: "13px", margin: "0 0 20px" }}>
+              Send <strong style={{ color: "#33bdef" }}>{pushModal.catLabel}</strong> checklist items to a project.
+            </p>
+
+            {pushStatus === "done" ? (
+              <div style={{ textAlign: "center" }}>
+                <p style={{ color: "#7ecb7b", fontSize: "15px", marginBottom: "20px" }}>✓ Checklist pushed successfully!</p>
+                <button onClick={() => setPushModal(null)} style={{ padding: "10px 28px", background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "8px", cursor: "pointer", fontFamily: "Manrope, sans-serif" }}>Close</button>
+              </div>
+            ) : pushStatus === "conflict" ? (
+              <div>
+                <div style={{ background: "#451a03", border: "1px solid #f59e0b", borderRadius: "8px", padding: "12px", marginBottom: "16px" }}>
+                  <p style={{ color: "#fcd34d", margin: 0, fontSize: "13px" }}>
+                    ⚠ This project already has items in the <strong>{pushModal.catLabel}</strong> checklist. Choose how to proceed:
+                  </p>
+                </div>
+                <div style={{ display: "grid", gap: "8px" }}>
+                  <button onClick={() => executePush("overwrite")} disabled={pushStatus === "pushing"} style={{
+                    padding: "12px 16px", background: "#450a0a", border: "1px solid #ef4444", color: "#fca5a5",
+                    borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600", textAlign: "left", fontFamily: "Manrope, sans-serif",
+                  }}>
+                    ⚠ Overwrite — replace all existing items with org defaults
+                  </button>
+                  <button onClick={() => executePush("new")} disabled={pushStatus === "pushing"} style={{
+                    padding: "12px 16px", background: "#012d5a", border: "1px solid #0095da", color: "#33bdef",
+                    borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontWeight: "600", textAlign: "left", fontFamily: "Manrope, sans-serif",
+                  }}>
+                    + Add as New — create a copy alongside the existing checklist
+                  </button>
+                  <button onClick={() => setPushStatus("idle")} style={{
+                    padding: "10px", background: "transparent", border: "1px solid #334155", color: "#94a3b8",
+                    borderRadius: "8px", cursor: "pointer", fontSize: "13px", fontFamily: "Manrope, sans-serif",
+                  }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <label style={{ display: "block", color: "#94a3b8", fontSize: "13px", marginBottom: "6px" }}>Select Project</label>
+                <select value={pushProjectId} onChange={(e) => setPushProjectId(e.target.value)} style={{
+                  width: "100%", padding: "10px 12px", background: "#0f172a", border: "1px solid #334155",
+                  borderRadius: "8px", color: "#f1f5f9", fontSize: "14px", marginBottom: "20px",
+                  boxSizing: "border-box", fontFamily: "Manrope, sans-serif",
+                }}>
+                  <option value="">— choose a project —</option>
+                  {orgProjects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button onClick={() => setPushModal(null)} style={{ flex: 1, padding: "10px", background: "#334155", color: "#f1f5f9", border: "none", borderRadius: "8px", cursor: "pointer", fontSize: "14px", fontFamily: "Manrope, sans-serif" }}>
+                    Cancel
+                  </button>
+                  <button onClick={checkAndPush} disabled={!pushProjectId || pushStatus === "checking"} style={{
+                    flex: 1, padding: "10px", background: pushProjectId ? "#0095da" : "#1e293b",
+                    color: pushProjectId ? "white" : "#475569", border: "none", borderRadius: "8px",
+                    cursor: pushProjectId ? "pointer" : "not-allowed", fontSize: "14px", fontWeight: "600", fontFamily: "Manrope, sans-serif",
+                  }}>
+                    {pushStatus === "checking" ? "Checking..." : "Push"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
