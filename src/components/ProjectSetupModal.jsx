@@ -119,6 +119,28 @@ function ChecklistsTab({ project, userRole }) {
   const getLabel = (cat) => config[cat.id]?.label || cat.label;
   const mBtn = (extra = {}) => ({ padding: "3px 7px", background: "transparent", border: "1px solid #334155", color: "#64748b", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontFamily: "Manrope, sans-serif", ...extra });
 
+  // Reference codes: itemId → "PREFIX-S.I"
+  const refCodes = (() => {
+    const codes = {};
+    allCats.forEach((cat) => {
+      if (config[cat.id]?.enabled === false) return;
+      const label = getLabel(cat);
+      const prefix = label.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase();
+      const catItems = [...(items[cat.id] || [])]
+        .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999) || a.item_id.localeCompare(b.item_id));
+      const seenSections = [];
+      catItems.forEach((item) => {
+        const s = item.sub_section || null;
+        if (!seenSections.includes(s)) seenSections.push(s);
+      });
+      seenSections.forEach((section, sIdx) => {
+        catItems.filter((i) => (i.sub_section || null) === section)
+          .forEach((item, iIdx) => { codes[item.id] = `${prefix}-${sIdx + 1}.${iIdx + 1}`; });
+      });
+    });
+    return codes;
+  })();
+
   const toggle = async (catId) => {
     if (!canEdit) return;
     const newEnabled = !(config[catId]?.enabled !== false);
@@ -491,6 +513,7 @@ function ChecklistsTab({ project, userRole }) {
                                   />
                                 ) : (
                                   <span style={{ flex: 1, color: "#cbd5e1", fontSize: "13px", lineHeight: 1.4 }}>
+                                    {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "#475569", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
                                     {item.item_text}
                                     {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
                                     {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}
@@ -571,6 +594,7 @@ function ChecklistsTab({ project, userRole }) {
                                       />
                                     ) : (
                                       <span style={{ flex: 1, color: "#94a3b8", fontSize: "13px", lineHeight: 1.4 }}>
+                                        {refCodes[item.id] && <span style={{ marginRight: "6px", fontSize: "9px", fontWeight: "700", color: "#475569", fontFamily: "monospace", letterSpacing: "0.04em" }}>{refCodes[item.id]}</span>}
                                         {item.item_text}
                                         {item.edited_by_pm && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#f59e0b", background: "#451a03", padding: "1px 5px", borderRadius: "3px" }}>edited</span>}
                                         {item.is_custom && <span style={{ marginLeft: "6px", fontSize: "10px", color: "#a78bfa", background: "#2e1065", padding: "1px 5px", borderRadius: "3px" }}>custom</span>}

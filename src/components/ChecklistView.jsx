@@ -116,6 +116,29 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const allCategories = [...CATEGORIES, ...customCats];
   const enabledCategories = allCategories.filter((cat) => categoryConfig[cat.id]?.enabled !== false);
 
+  // Build reference codes: itemId → "PREFIX-S.I"
+  const refCodes = (() => {
+    const codes = {};
+    enabledCategories.forEach((cat) => {
+      const label = getCatLabel(cat.id);
+      const prefix = label.replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase();
+      const catItems = [...checklists.filter((c) => c.category === cat.id)]
+        .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999) || a.item_id.localeCompare(b.item_id));
+      // Ordered unique sections
+      const seenSections = [];
+      catItems.forEach((item) => {
+        const s = item.sub_section || null;
+        if (!seenSections.includes(s)) seenSections.push(s);
+      });
+      seenSections.forEach((section, sIdx) => {
+        const sNum = sIdx + 1;
+        catItems.filter((i) => (i.sub_section || null) === section)
+          .forEach((item, iIdx) => { codes[item.id] = `${prefix}-${sNum}.${iIdx + 1}`; });
+      });
+    });
+    return codes;
+  })();
+
   useEffect(() => {
     if (!activeCategory && enabledCategories.length > 0) setActiveCategory(enabledCategories[0].id);
   }, [categoryConfig, loading]);
@@ -284,6 +307,11 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
           {/* Text */}
           <div style={{ flex: 1, minWidth: 0 }}>
+            {refCodes[item.id] && (
+              <span style={{ display: "inline-block", fontSize: "10px", fontWeight: "700", color: "#475569", fontFamily: "monospace", marginBottom: "2px", letterSpacing: "0.04em" }}>
+                {refCodes[item.id]}
+              </span>
+            )}
             <p style={{
               margin: 0, fontSize: isMobile ? "13px" : "14px", lineHeight: "1.5",
               color: status === "na" ? "#64748b" : "#f1f5f9",
