@@ -116,6 +116,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const allCategories = [...CATEGORIES, ...customCats];
   const enabledCategories = allCategories.filter((cat) => categoryConfig[cat.id]?.enabled !== false);
 
+  const getCatLabel = (catId) =>
+    categoryConfig[catId]?.label || CATEGORIES.find((c) => c.id === catId)?.label || catId;
+
   // Build reference codes: itemId → "PREFIX-S.I"
   const refCodes = (() => {
     const codes = {};
@@ -142,9 +145,6 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   useEffect(() => {
     if (!activeCategory && enabledCategories.length > 0) setActiveCategory(enabledCategories[0].id);
   }, [categoryConfig, loading]);
-
-  const getCatLabel = (catId) =>
-    categoryConfig[catId]?.label || CATEGORIES.find((c) => c.id === catId)?.label || catId;
 
   const canEdit = (category) => {
     if (userRole === "project_manager") return true;
