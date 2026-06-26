@@ -46,7 +46,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const fetchAll = async () => {
     setLoading(true);
     const [checklistRes, configRes, memberRes, milestoneRes] = await Promise.all([
-      supabase.from("checklists").select("*").eq("project_id", project.id).order("category").order("item_id"),
+      supabase.from("checklists").select("*").eq("project_id", project.id).order("category").order("sort_order", { nullsFirst: false }).order("item_id"),
       supabase.from("project_checklist_config").select("*").eq("project_id", project.id),
       supabase.from("project_members").select("user_id").eq("project_id", project.id),
       supabase.from("project_milestones").select("*").eq("project_id", project.id).order("date"),

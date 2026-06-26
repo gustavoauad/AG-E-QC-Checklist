@@ -211,29 +211,34 @@ function MembersTab({ org, session, orgRole }) {
 // ── Checklists tab ───────────────────────────────────────────────────────────
 function ChecklistsTab({ org, orgRole }) {
   const [config, setConfig] = useState({});
-  const [customCats, setCustomCats] = useState([]); // [{id, label, sort_order}]
+  const [customCats, setCustomCats] = useState([]);
   const [items, setItems] = useState({});
+  const [sections, setSections] = useState({}); // { [catId]: [{label, sort_order}] }
   const [loading, setLoading] = useState(true);
   const [expandedCat, setExpandedCat] = useState(null);
   const [renamingCat, setRenamingCat] = useState(null);
   const [renameText, setRenameText] = useState("");
   const [editingItemId, setEditingItemId] = useState(null);
   const [editItemText, setEditItemText] = useState("");
-  const [addingTo, setAddingTo] = useState(null);
+  const [addingTo, setAddingTo] = useState(null); // { catId, section: string|null }
   const [newItemText, setNewItemText] = useState("");
-  const [dragIdx, setDragIdx] = useState(null);
-  const [dropIdx, setDropIdx] = useState(null);
-  const dragCat = useRef(null);
   const [addingCat, setAddingCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [savingCat, setSavingCat] = useState(false);
+  const [addingSection, setAddingSection] = useState(null); // catId
+  const [newSectionText, setNewSectionText] = useState("");
+  const [renamingSection, setRenamingSection] = useState(null); // { catId, label }
+  const [renameSectionText, setRenameSectionText] = useState("");
+  const dragInfo = useRef(null);
+  const [dragOver, setDragOver] = useState(null);
 
   useEffect(() => { fetchAll(); }, []);
 
   const fetchAll = async () => {
-    const [{ data: cfgData }, { data: itemData }] = await Promise.all([
+    const [{ data: cfgData }, { data: itemData }, { data: sectionData }] = await Promise.all([
       supabase.from("org_checklist_config").select("*").eq("organization_id", org.id).order("sort_order"),
       supabase.from("org_checklist_items").select("*").eq("organization_id", org.id).order("sort_order"),
+      supabase.from("org_checklist_sections").select("*").eq("organization_id", org.id).order("sort_order"),
     ]);
     const cfgMap = {};
     const customs = [];
@@ -243,21 +248,26 @@ function ChecklistsTab({ org, orgRole }) {
     });
     setConfig(cfgMap);
     setCustomCats(customs.sort((a, b) => a.sort_order - b.sort_order));
-
     const itemMap = {};
     (itemData || []).forEach((r) => {
       if (!itemMap[r.category]) itemMap[r.category] = [];
       itemMap[r.category].push(r);
     });
     setItems(itemMap);
+    const sectionMap = {};
+    (sectionData || []).forEach((r) => {
+      if (!sectionMap[r.category]) sectionMap[r.category] = [];
+      sectionMap[r.category].push({ label: r.label, sort_order: r.sort_order });
+    });
+    setSections(sectionMap);
     setLoading(false);
   };
 
   // ── Push to project ─────────────────────────────────────────────────────────
-  const [pushModal, setPushModal] = useState(null); // { catId, catLabel }
+  const [pushModal, setPushModal] = useState(null);
   const [orgProjects, setOrgProjects] = useState([]);
   const [selectedProjIds, setSelectedProjIds] = useState(new Set());
-  const [pushStatus, setPushStatus] = useState("idle"); // idle|checking|conflict|pushing|done
+  const [pushStatus, setPushStatus] = useState("idle");
   const [pushError, setPushError] = useState("");
   const [conflictNames, setConflictNames] = useState([]);
 
@@ -289,12 +299,20 @@ function ChecklistsTab({ org, orgRole }) {
     setPushStatus("pushing"); setPushError("");
     const { catId, catLabel } = pushModal;
     const catItems = items[catId] !== undefined ? items[catId] : await initCategory(catId);
+    const catSections = sections[catId] || [];
+
+    // Order items: sectioned items grouped by section order, then unsectioned
+    const sectionOrder = catSections.map((s) => s.label);
+    const sortedItems = [
+      ...sectionOrder.flatMap((sl) => catItems.filter((i) => i.section === sl)),
+      ...catItems.filter((i) => !i.section),
+    ];
 
     const { error } = await supabase.rpc("push_checklist_to_projects", {
       p_project_ids: [...selectedProjIds],
       p_category:    catId,
       p_label:       catLabel,
-      p_items:       catItems.map((i) => ({ item_id: i.item_id, item_text: i.item_text })),
+      p_items:       sortedItems.map((i) => ({ item_id: i.item_id, item_text: i.item_text, section: i.section || null })),
       p_action:      action,
     });
 
@@ -330,6 +348,7 @@ function ChecklistsTab({ org, orgRole }) {
     setCustomCats((p) => [...p, { id: catId, label: newCatName.trim(), sort_order: maxOrder + 1 }]);
     setConfig((p) => ({ ...p, [catId]: { enabled: true, label: newCatName.trim(), is_custom: true } }));
     setItems((p) => ({ ...p, [catId]: [] }));
+    setSections((p) => ({ ...p, [catId]: [] }));
     setNewCatName(""); setAddingCat(false); setSavingCat(false);
   };
 
@@ -337,25 +356,50 @@ function ChecklistsTab({ org, orgRole }) {
     if (!window.confirm("Delete this checklist and all its items? This cannot be undone.")) return;
     await Promise.all([
       supabase.from("org_checklist_items").delete().eq("organization_id", org.id).eq("category", catId),
+      supabase.from("org_checklist_sections").delete().eq("organization_id", org.id).eq("category", catId),
       supabase.from("org_checklist_config").delete().eq("organization_id", org.id).eq("category", catId),
     ]);
     setCustomCats((p) => p.filter((c) => c.id !== catId));
     setConfig((p) => { const n = { ...p }; delete n[catId]; return n; });
     setItems((p) => { const n = { ...p }; delete n[catId]; return n; });
+    setSections((p) => { const n = { ...p }; delete n[catId]; return n; });
     if (expandedCat === catId) setExpandedCat(null);
   };
 
-  // Copy template items for a category into org_checklist_items (lazy init)
+  // Lazy-init: copy template items + sections into org tables on first expand
   const initCategory = async (catId) => {
     const templateItems = CHECKLIST_TEMPLATE.filter((i) => i.category === catId);
-    if (!templateItems.length) { setItems((p) => ({ ...p, [catId]: [] })); return []; }
+    if (!templateItems.length) {
+      setItems((p) => ({ ...p, [catId]: [] }));
+      setSections((p) => ({ ...p, [catId]: [] }));
+      return [];
+    }
+    // Extract unique sections in first-appearance order
+    const sectionLabels = [];
+    const seen = new Set();
+    templateItems.forEach((t) => {
+      if (t.sub_section && !seen.has(t.sub_section)) { seen.add(t.sub_section); sectionLabels.push(t.sub_section); }
+    });
     const toInsert = templateItems.map((t, idx) => ({
       organization_id: org.id, category: catId,
       item_id: t.item_id, item_text: t.text, sort_order: idx, enabled: true,
+      section: t.sub_section || null,
     }));
     const { data: inserted } = await supabase.from("org_checklist_items").insert(toInsert).select();
     const result = inserted || toInsert;
     setItems((p) => ({ ...p, [catId]: result }));
+    if (sectionLabels.length) {
+      const sectionsToInsert = sectionLabels.map((label, idx) => ({
+        organization_id: org.id, category: catId, label, sort_order: idx,
+      }));
+      const { data: insertedSections } = await supabase.from("org_checklist_sections").insert(sectionsToInsert).select();
+      setSections((p) => ({
+        ...p,
+        [catId]: (insertedSections || sectionsToInsert).map((s) => ({ label: s.label, sort_order: s.sort_order })),
+      }));
+    } else {
+      setSections((p) => ({ ...p, [catId]: [] }));
+    }
     return result;
   };
 
@@ -398,31 +442,154 @@ function ChecklistsTab({ org, orgRole }) {
     setItems((p) => ({ ...p, [item.category]: p[item.category].filter((i) => i.id !== item.id) }));
   };
 
-  const addItem = async (catId) => {
+  const addItem = async (catId, section) => {
     if (!newItemText.trim()) return;
     const catItems = items[catId] || [];
-    const maxOrder = catItems.reduce((m, i) => Math.max(m, i.sort_order), -1);
+    const maxOrder = catItems.reduce((m, i) => Math.max(m, i.sort_order ?? 0), -1);
     const { data: newItem } = await supabase.from("org_checklist_items").insert({
       organization_id: org.id, category: catId,
       item_id: `custom_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
       item_text: newItemText.trim(), sort_order: maxOrder + 1, enabled: true,
+      section: section || null,
     }).select().single();
     if (newItem) setItems((p) => ({ ...p, [catId]: [...(p[catId] || []), newItem] }));
     setNewItemText(""); setAddingTo(null);
   };
 
-  const handleDrop = async (catId, toIdx) => {
-    if (dragIdx === null || dragIdx === toIdx || dragCat.current !== catId) return;
-    const arr = [...(items[catId] || [])];
-    const [moved] = arr.splice(dragIdx, 1);
+  // ── Section CRUD ─────────────────────────────────────────────────────────────
+  const addSection = async (catId) => {
+    if (!newSectionText.trim()) return;
+    const catSections = sections[catId] || [];
+    const maxOrder = catSections.reduce((m, s) => Math.max(m, s.sort_order ?? 0), -1);
+    const label = newSectionText.trim();
+    await supabase.from("org_checklist_sections").insert({
+      organization_id: org.id, category: catId, label, sort_order: maxOrder + 1,
+    });
+    setSections((p) => ({ ...p, [catId]: [...(p[catId] || []), { label, sort_order: maxOrder + 1 }] }));
+    setNewSectionText(""); setAddingSection(null);
+  };
+
+  const renameSection = async (catId, oldLabel) => {
+    const newLabel = renameSectionText.trim();
+    if (!newLabel || newLabel === oldLabel) { setRenamingSection(null); return; }
+    await supabase.from("org_checklist_sections")
+      .update({ label: newLabel })
+      .eq("organization_id", org.id).eq("category", catId).eq("label", oldLabel);
+    await supabase.from("org_checklist_items")
+      .update({ section: newLabel })
+      .eq("organization_id", org.id).eq("category", catId).eq("section", oldLabel);
+    setSections((p) => ({
+      ...p,
+      [catId]: (p[catId] || []).map((s) => s.label === oldLabel ? { ...s, label: newLabel } : s),
+    }));
+    setItems((p) => ({
+      ...p,
+      [catId]: (p[catId] || []).map((i) => i.section === oldLabel ? { ...i, section: newLabel } : i),
+    }));
+    setRenamingSection(null);
+  };
+
+  const deleteSection = async (catId, label) => {
+    if (!window.confirm(`Remove section "${label}"? Items in it will become unsectioned.`)) return;
+    await supabase.from("org_checklist_sections")
+      .delete().eq("organization_id", org.id).eq("category", catId).eq("label", label);
+    await supabase.from("org_checklist_items")
+      .update({ section: null })
+      .eq("organization_id", org.id).eq("category", catId).eq("section", label);
+    setSections((p) => ({ ...p, [catId]: (p[catId] || []).filter((s) => s.label !== label) }));
+    setItems((p) => ({
+      ...p,
+      [catId]: (p[catId] || []).map((i) => i.section === label ? { ...i, section: null } : i),
+    }));
+  };
+
+  // ── Drag & drop ──────────────────────────────────────────────────────────────
+  const handleSectionDragStart = (e, catId, label, fromIdx) => {
+    e.stopPropagation();
+    dragInfo.current = { type: "section", catId, label, fromIdx };
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleSectionDragOver = (e, catId, label, toIdx) => {
+    e.preventDefault(); e.stopPropagation();
+    if (dragInfo.current?.type === "section" && dragInfo.current?.catId === catId) {
+      setDragOver(`so:${catId}:${toIdx}`);
+    } else if (dragInfo.current?.type === "item" && dragInfo.current?.catId === catId) {
+      setDragOver(`sh:${catId}:${label}`); // section header as item drop target
+    }
+  };
+
+  const handleSectionDrop = (e, catId, label, toIdx) => {
+    e.stopPropagation();
+    if (dragInfo.current?.type === "section" && dragInfo.current?.catId === catId) {
+      reorderSections(catId, dragInfo.current.label, toIdx);
+    } else if (dragInfo.current?.type === "item" && dragInfo.current?.catId === catId) {
+      assignItemToSection(catId, dragInfo.current.itemId, label);
+    }
+    dragInfo.current = null; setDragOver(null);
+  };
+
+  const reorderSections = async (catId, fromLabel, toIdx) => {
+    const arr = [...(sections[catId] || [])];
+    const fromIdx = arr.findIndex((s) => s.label === fromLabel);
+    if (fromIdx === -1 || fromIdx === toIdx) return;
+    const [moved] = arr.splice(fromIdx, 1);
     arr.splice(toIdx, 0, moved);
-    const reordered = arr.map((item, idx) => ({ ...item, sort_order: idx }));
-    setItems((p) => ({ ...p, [catId]: reordered }));
-    setDragIdx(null); setDropIdx(null); dragCat.current = null;
-    await Promise.all(reordered.map((item) =>
-      supabase.from("org_checklist_items").update({ sort_order: item.sort_order }).eq("id", item.id)
+    const reordered = arr.map((s, idx) => ({ ...s, sort_order: idx }));
+    setSections((p) => ({ ...p, [catId]: reordered }));
+    await Promise.all(reordered.map((s) =>
+      supabase.from("org_checklist_sections")
+        .update({ sort_order: s.sort_order })
+        .eq("organization_id", org.id).eq("category", catId).eq("label", s.label)
     ));
   };
+
+  const assignItemToSection = async (catId, itemId, newSection) => {
+    const catItems = items[catId] || [];
+    const idx = catItems.findIndex((i) => i.id === itemId);
+    if (idx === -1) return;
+    const updated = catItems.map((i) => i.id === itemId ? { ...i, section: newSection } : i);
+    setItems((p) => ({ ...p, [catId]: updated }));
+    await supabase.from("org_checklist_items").update({ section: newSection }).eq("id", itemId);
+  };
+
+  const handleItemDragStart = (e, catId, itemId) => {
+    e.stopPropagation();
+    dragInfo.current = { type: "item", catId, itemId };
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleItemDragOver = (e, catId, targetItemId) => {
+    if (dragInfo.current?.type !== "item" || dragInfo.current?.catId !== catId) return;
+    e.preventDefault(); e.stopPropagation();
+    setDragOver(`item:${targetItemId}`);
+  };
+
+  const handleItemDrop = (e, catId, targetItemId, targetSection) => {
+    e.stopPropagation();
+    if (dragInfo.current?.type !== "item" || dragInfo.current?.catId !== catId) return;
+    moveItemBefore(catId, dragInfo.current.itemId, targetItemId, targetSection);
+    dragInfo.current = null; setDragOver(null);
+  };
+
+  const moveItemBefore = async (catId, draggedId, targetId, targetSection) => {
+    if (draggedId === targetId) return;
+    const arr = [...(items[catId] || [])];
+    const fromIdx = arr.findIndex((i) => i.id === draggedId);
+    if (fromIdx === -1) return;
+    const [moved] = arr.splice(fromIdx, 1);
+    const toIdx = arr.findIndex((i) => i.id === targetId);
+    arr.splice(toIdx, 0, { ...moved, section: targetSection || null });
+    const reordered = arr.map((item, idx) => ({ ...item, sort_order: idx }));
+    setItems((p) => ({ ...p, [catId]: reordered }));
+    await Promise.all(reordered.map((item) =>
+      supabase.from("org_checklist_items")
+        .update({ sort_order: item.sort_order, section: item.section || null })
+        .eq("id", item.id)
+    ));
+  };
+
+  const handleDragEnd = () => { dragInfo.current = null; setDragOver(null); };
 
   const getLabel = (cat) => config[cat.id]?.label || cat.label;
 
@@ -433,6 +600,12 @@ function ChecklistsTab({ org, orgRole }) {
     ...customCats.map((c) => ({ id: c.id, label: config[c.id]?.label || c.label, isCustom: true })),
   ];
 
+  const mBtn = (extra = {}) => ({
+    padding: "3px 7px", background: "transparent", border: "1px solid #334155",
+    color: "#64748b", borderRadius: "4px", cursor: "pointer", fontSize: "11px",
+    fontFamily: "Manrope, sans-serif", ...extra,
+  });
+
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "20px", flexWrap: "wrap", gap: "10px" }}>
@@ -440,7 +613,7 @@ function ChecklistsTab({ org, orgRole }) {
           <h3 style={{ color: "#f1f5f9", margin: "0 0 4px", fontSize: "16px" }}>Default Checklists</h3>
           <p style={{ color: "#64748b", fontSize: "13px", margin: 0 }}>
             {orgRole === "admin"
-              ? "Customize categories and items. New projects inherit these defaults."
+              ? "Customize categories, sections, and items. New projects inherit these defaults."
               : "Default checklist configuration for this organization."}
           </p>
         </div>
@@ -482,6 +655,7 @@ function ChecklistsTab({ org, orgRole }) {
           const enabled = config[cat.id]?.enabled !== false;
           const isExpanded = expandedCat === cat.id;
           const catItems = items[cat.id];
+          const catSections = (sections[cat.id] || []).slice().sort((a, b) => a.sort_order - b.sort_order);
           const isRenamingThis = renamingCat === cat.id;
 
           return (
@@ -503,8 +677,6 @@ function ChecklistsTab({ org, orgRole }) {
                     {enabled ? "ON" : "OFF"}
                   </button>
                 )}
-
-                {/* Category name / rename inline */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {isRenamingThis ? (
                     <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
@@ -527,22 +699,16 @@ function ChecklistsTab({ org, orgRole }) {
                     </div>
                   )}
                 </div>
-
-                {/* Actions */}
                 {orgRole === "admin" && !isRenamingThis && (
                   <div style={{ display: "flex", gap: "5px", flexShrink: 0 }}>
                     <button onClick={() => openPushModal(cat)} style={{
                       padding: "3px 8px", background: "transparent", border: "1px solid #29439b",
                       color: "#818cf8", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
-                    }} title="Push this checklist to a specific project">
-                      ↗ Push
-                    </button>
+                    }}>↗ Push</button>
                     <button onClick={() => { setRenamingCat(cat.id); setRenameText(getLabel(cat)); }} style={{
                       padding: "3px 8px", background: "transparent", border: "1px solid #334155",
                       color: "#64748b", borderRadius: "5px", cursor: "pointer", fontSize: "11px",
-                    }}>
-                      Rename
-                    </button>
+                    }}>Rename</button>
                     {cat.isCustom && (
                       <button onClick={() => deleteCustomCategory(cat.id)} style={{
                         padding: "3px 7px", background: "transparent", border: "1px solid #334155",
@@ -566,78 +732,299 @@ function ChecklistsTab({ org, orgRole }) {
                     <p style={{ color: "#94a3b8", fontSize: "13px", margin: 0 }}>Loading items...</p>
                   ) : (
                     <>
-                      <div style={{ display: "grid", gap: "4px", marginBottom: catItems.length ? "10px" : "0" }}>
-                        {catItems.map((item, idx) => (
-                          <div
-                            key={item.id}
-                            draggable={orgRole === "admin" && editingItemId !== item.id}
-                            onDragStart={() => { setDragIdx(idx); dragCat.current = cat.id; }}
-                            onDragOver={(e) => { e.preventDefault(); setDropIdx(idx); }}
-                            onDrop={() => handleDrop(cat.id, idx)}
-                            onDragEnd={() => { setDragIdx(null); setDropIdx(null); dragCat.current = null; }}
-                            style={{
-                              display: "flex", alignItems: "center", gap: "8px",
-                              padding: "7px 10px", borderRadius: "6px",
-                              background: dropIdx === idx && dragIdx !== idx && dragCat.current === cat.id ? "#012d5a" : "#1e293b",
-                              border: `1px solid ${dropIdx === idx && dragIdx !== idx && dragCat.current === cat.id ? "#0095da" : "#2d3f55"}`,
-                              opacity: dragIdx === idx ? 0.35 : 1,
-                              transition: "background 0.1s",
-                            }}>
+                      {/* ── Sections ─────────────────────────────────────── */}
+                      {catSections.map((section, sIdx) => {
+                        const sectionItems = catItems.filter((i) => i.section === section.label);
+                        const isSectionDragTarget = dragOver === `sh:${cat.id}:${section.label}`;
+                        const isOrderTarget = dragOver === `so:${cat.id}:${sIdx}`;
+                        const isBeingDragged = dragInfo.current?.type === "section" && dragInfo.current?.label === section.label;
+                        const isRenamingThisSection = renamingSection?.catId === cat.id && renamingSection?.label === section.label;
+
+                        return (
+                          <div key={section.label} style={{ marginBottom: "10px", opacity: isBeingDragged ? 0.35 : 1 }}>
+                            {/* Section header */}
+                            <div
+                              draggable={orgRole === "admin" && !isRenamingThisSection}
+                              onDragStart={(e) => handleSectionDragStart(e, cat.id, section.label, sIdx)}
+                              onDragOver={(e) => handleSectionDragOver(e, cat.id, section.label, sIdx)}
+                              onDrop={(e) => handleSectionDrop(e, cat.id, section.label, sIdx)}
+                              onDragEnd={handleDragEnd}
+                              style={{
+                                display: "flex", alignItems: "center", gap: "8px",
+                                padding: "6px 10px 6px 8px",
+                                background: isSectionDragTarget ? "#012d5a" : isOrderTarget ? "#0d2340" : "#0c1a28",
+                                borderLeft: `3px solid ${isSectionDragTarget ? "#f59e0b" : "#0095da"}`,
+                                borderRadius: "0 6px 6px 0", marginBottom: "4px",
+                                cursor: orgRole === "admin" && !isRenamingThisSection ? "grab" : "default",
+                                transition: "background 0.12s",
+                              }}
+                            >
+                              {orgRole === "admin" && (
+                                <span style={{ color: "#475569", fontSize: "14px", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                              )}
+                              {isRenamingThisSection ? (
+                                <div style={{ display: "flex", gap: "6px", flex: 1, alignItems: "center" }}
+                                  onClick={(e) => e.stopPropagation()}>
+                                  <input
+                                    autoFocus value={renameSectionText}
+                                    onChange={(e) => setRenameSectionText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") renameSection(cat.id, section.label);
+                                      if (e.key === "Escape") setRenamingSection(null);
+                                    }}
+                                    style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "12px" }}
+                                  />
+                                  <button onClick={() => renameSection(cat.id, section.label)}
+                                    style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                  <button onClick={() => setRenamingSection(null)} style={mBtn()}>×</button>
+                                </div>
+                              ) : (
+                                <>
+                                  <span style={{ flex: 1, color: "#7dd3fc", fontSize: "11px", fontWeight: "700", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                    {section.label}
+                                  </span>
+                                  {isSectionDragTarget && (
+                                    <span style={{ color: "#f59e0b", fontSize: "10px", flexShrink: 0 }}>drop to assign</span>
+                                  )}
+                                  {orgRole === "admin" && (
+                                    <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+                                      <button onClick={() => { setRenamingSection({ catId: cat.id, label: section.label }); setRenameSectionText(section.label); }}
+                                        style={mBtn()}>Rename</button>
+                                      <button onClick={() => deleteSection(cat.id, section.label)}
+                                        style={mBtn({ color: "#ef4444" })}>✕</button>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            {/* Items in this section */}
+                            <div style={{ display: "grid", gap: "3px", marginLeft: "12px" }}>
+                              {sectionItems.map((item) => {
+                                const isItemDragOver = dragOver === `item:${item.id}`;
+                                const isItemBeingDragged = dragInfo.current?.type === "item" && dragInfo.current?.itemId === item.id;
+                                return (
+                                  <div
+                                    key={item.id}
+                                    draggable={orgRole === "admin" && editingItemId !== item.id}
+                                    onDragStart={(e) => handleItemDragStart(e, cat.id, item.id)}
+                                    onDragOver={(e) => handleItemDragOver(e, cat.id, item.id)}
+                                    onDrop={(e) => handleItemDrop(e, cat.id, item.id, item.section)}
+                                    onDragEnd={handleDragEnd}
+                                    style={{
+                                      display: "flex", alignItems: "center", gap: "8px",
+                                      padding: "6px 10px", borderRadius: "0 6px 6px 0",
+                                      borderLeft: `2px solid ${isItemDragOver ? "#0095da" : "#29439b"}`,
+                                      background: isItemDragOver ? "#012d5a" : "#1a2a3a",
+                                      opacity: isItemBeingDragged ? 0.3 : 1,
+                                      transition: "background 0.1s",
+                                    }}
+                                  >
+                                    {orgRole === "admin" && (
+                                      <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                                    )}
+                                    {editingItemId === item.id ? (
+                                      <input autoFocus value={editItemText}
+                                        onChange={(e) => setEditItemText(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
+                                        style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                      />
+                                    ) : (
+                                      <span style={{ flex: 1, color: "#cbd5e1", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                    )}
+                                    {orgRole === "admin" && (
+                                      <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+                                        {editingItemId === item.id ? (
+                                          <>
+                                            <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                            <button onClick={() => setEditingItemId(null)} style={mBtn()}>×</button>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
+                                            <button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>✕</button>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Add item to this section */}
                             {orgRole === "admin" && (
-                              <span style={{ color: "#475569", fontSize: "15px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                              addingTo?.catId === cat.id && addingTo?.section === section.label ? (
+                                <div style={{ display: "flex", gap: "6px", marginTop: "4px", marginLeft: "12px" }}>
+                                  <input autoFocus value={newItemText}
+                                    onChange={(e) => setNewItemText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, section.label); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
+                                    placeholder="New item text..."
+                                    style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                                  />
+                                  <button onClick={() => addItem(cat.id, section.label)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                                  <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>×</button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => setAddingTo({ catId: cat.id, section: section.label })}
+                                  style={{
+                                    display: "block", width: "calc(100% - 12px)", marginLeft: "12px", marginTop: "4px",
+                                    padding: "5px", background: "transparent", border: "1px dashed #29439b",
+                                    borderRadius: "5px", color: "#475569", fontSize: "11px", cursor: "pointer",
+                                    fontFamily: "Manrope, sans-serif",
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#7dd3fc"; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#29439b"; e.currentTarget.style.color = "#475569"; }}
+                                >
+                                  + Add Item to "{section.label}"
+                                </button>
+                              )
                             )}
-                            {editingItemId === item.id ? (
-                              <input autoFocus value={editItemText}
-                                onChange={(e) => setEditItemText(e.target.value)}
-                                onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                style={{ flex: 1, padding: "4px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
-                              />
-                            ) : (
-                              <span style={{ flex: 1, color: "#cbd5e1", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
-                            )}
-                            {orgRole === "admin" && (
-                              <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                                {editingItemId === item.id ? (
-                                  <>
-                                    <button onClick={() => saveItemEdit(item)} style={{ padding: "3px 8px", background: "#0095da", color: "white", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>Save</button>
-                                    <button onClick={() => setEditingItemId(null)} style={{ padding: "3px 6px", background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>×</button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={{ padding: "3px 8px", background: "transparent", border: "1px solid #334155", color: "#64748b", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>Edit</button>
-                                    <button onClick={() => removeItem(item)} style={{ padding: "3px 6px", background: "transparent", border: "1px solid #334155", color: "#ef4444", borderRadius: "4px", cursor: "pointer", fontSize: "11px" }}>✕</button>
-                                  </>
+                          </div>
+                        );
+                      })}
+
+                      {/* ── No-section items ─────────────────────────────── */}
+                      {(() => {
+                        const noSection = catItems.filter((i) => !i.section);
+                        return (
+                          <>
+                            {noSection.length > 0 && (
+                              <div style={{ marginTop: catSections.length > 0 ? "10px" : 0 }}>
+                                {catSections.length > 0 && (
+                                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
+                                    <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
+                                    <span style={{ color: "#475569", fontSize: "10px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>No Section</span>
+                                    <div style={{ flex: 1, height: "1px", background: "#2d3f55" }} />
+                                  </div>
                                 )}
+                                <div style={{ display: "grid", gap: "3px" }}>
+                                  {noSection.map((item) => {
+                                    const isItemDragOver = dragOver === `item:${item.id}`;
+                                    const isItemBeingDragged = dragInfo.current?.type === "item" && dragInfo.current?.itemId === item.id;
+                                    return (
+                                      <div
+                                        key={item.id}
+                                        draggable={orgRole === "admin" && editingItemId !== item.id}
+                                        onDragStart={(e) => handleItemDragStart(e, cat.id, item.id)}
+                                        onDragOver={(e) => handleItemDragOver(e, cat.id, item.id)}
+                                        onDrop={(e) => handleItemDrop(e, cat.id, item.id, null)}
+                                        onDragEnd={handleDragEnd}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: "8px",
+                                          padding: "6px 10px", borderRadius: "6px",
+                                          borderLeft: `2px dashed ${isItemDragOver ? "#0095da" : "#334155"}`,
+                                          background: isItemDragOver ? "#012d5a" : "#1e293b",
+                                          opacity: isItemBeingDragged ? 0.3 : 1,
+                                          transition: "background 0.1s",
+                                        }}
+                                      >
+                                        {orgRole === "admin" && (
+                                          <span style={{ color: "#475569", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
+                                        )}
+                                        {editingItemId === item.id ? (
+                                          <input autoFocus value={editItemText}
+                                            onChange={(e) => setEditItemText(e.target.value)}
+                                            onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
+                                            style={{ flex: 1, padding: "3px 8px", background: "#0f172a", border: "1px solid #0095da", borderRadius: "4px", color: "#f1f5f9", fontSize: "13px" }}
+                                          />
+                                        ) : (
+                                          <span style={{ flex: 1, color: "#94a3b8", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                        )}
+                                        {orgRole === "admin" && (
+                                          <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
+                                            {editingItemId === item.id ? (
+                                              <>
+                                                <button onClick={() => saveItemEdit(item)} style={mBtn({ background: "#0095da", color: "white", border: "none" })}>Save</button>
+                                                <button onClick={() => setEditingItemId(null)} style={mBtn()}>×</button>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
+                                                <button onClick={() => removeItem(item)} style={mBtn({ color: "#ef4444" })}>✕</button>
+                                              </>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
                             )}
-                          </div>
-                        ))}
-                      </div>
 
-                      {/* Add item */}
-                      {orgRole === "admin" && (
-                        addingTo === cat.id ? (
-                          <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "6px" }}>
-                            <input autoFocus value={newItemText}
-                              onChange={(e) => setNewItemText(e.target.value)}
-                              onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
-                              placeholder="New item text..."
-                              style={{ flex: 1, padding: "7px 10px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "6px", color: "#f1f5f9", fontSize: "13px" }}
-                            />
-                            <button onClick={() => addItem(cat.id)} style={{ padding: "7px 14px", background: "#0095da", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>Add</button>
-                            <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={{ padding: "7px 10px", background: "transparent", border: "1px solid #334155", color: "#94a3b8", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>×</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => setAddingTo(cat.id)} style={{
-                            width: "100%", padding: "7px", background: "transparent",
-                            border: "1px dashed #334155", borderRadius: "6px", marginTop: "6px",
-                            color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
-                          }}
-                          onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
-                          onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
-                            + Add Item
-                          </button>
-                        )
+                            {/* Add unsectioned item */}
+                            {orgRole === "admin" && (
+                              addingTo?.catId === cat.id && addingTo?.section === null ? (
+                                <div style={{ display: "flex", gap: "6px", marginTop: "6px" }}>
+                                  <input autoFocus value={newItemText}
+                                    onChange={(e) => setNewItemText(e.target.value)}
+                                    onKeyDown={(e) => { if (e.key === "Enter") addItem(cat.id, null); if (e.key === "Escape") { setAddingTo(null); setNewItemText(""); } }}
+                                    placeholder="New item text..."
+                                    style={{ flex: 1, padding: "6px 9px", background: "#1e293b", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                                  />
+                                  <button onClick={() => addItem(cat.id, null)} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Add</button>
+                                  <button onClick={() => { setAddingTo(null); setNewItemText(""); }} style={mBtn({ padding: "6px 9px" })}>×</button>
+                                </div>
+                              ) : null
+                            )}
+                          </>
+                        );
+                      })()}
+
+                      {/* ── Bottom actions ───────────────────────────────── */}
+                      {orgRole === "admin" && addingTo?.catId !== cat.id && (
+                        <div style={{ display: "flex", gap: "6px", marginTop: "8px", flexWrap: "wrap" }}>
+                          {catSections.length > 0 ? (
+                            <button onClick={() => setAddingTo({ catId: cat.id, section: null })} style={{
+                              flex: 1, padding: "6px 10px", background: "transparent",
+                              border: "1px dashed #334155", borderRadius: "6px",
+                              color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
+                              + Add Item (No Section)
+                            </button>
+                          ) : (
+                            <button onClick={() => setAddingTo({ catId: cat.id, section: null })} style={{
+                              flex: 1, padding: "6px 10px", background: "transparent",
+                              border: "1px dashed #334155", borderRadius: "6px",
+                              color: "#64748b", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#0095da"; e.currentTarget.style.color = "#33bdef"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#334155"; e.currentTarget.style.color = "#64748b"; }}>
+                              + Add Item
+                            </button>
+                          )}
+                          {addingSection !== cat.id && (
+                            <button onClick={() => { setAddingSection(cat.id); setNewSectionText(""); }} style={{
+                              padding: "6px 12px", background: "transparent",
+                              border: "1px dashed #0095da", borderRadius: "6px",
+                              color: "#0095da", fontSize: "12px", cursor: "pointer", fontFamily: "Manrope, sans-serif",
+                            }}
+                            onMouseEnter={(e) => { e.currentTarget.style.background = "#012d5a"; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}>
+                              + Add Section
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Add section form */}
+                      {addingSection === cat.id && (
+                        <div style={{ display: "flex", gap: "6px", marginTop: "8px", alignItems: "center" }}>
+                          <div style={{ width: "3px", background: "#0095da", borderRadius: "2px", alignSelf: "stretch", flexShrink: 0 }} />
+                          <input
+                            autoFocus value={newSectionText}
+                            onChange={(e) => setNewSectionText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter") addSection(cat.id); if (e.key === "Escape") setAddingSection(null); }}
+                            placeholder="Section name..."
+                            style={{ flex: 1, padding: "6px 10px", background: "#0c1a28", border: "1px solid #0095da", borderRadius: "5px", color: "#f1f5f9", fontSize: "13px" }}
+                          />
+                          <button onClick={() => addSection(cat.id)} disabled={!newSectionText.trim()} style={mBtn({ background: "#0095da", color: "white", border: "none", padding: "6px 12px" })}>Create</button>
+                          <button onClick={() => setAddingSection(null)} style={mBtn({ padding: "6px 9px" })}>×</button>
+                        </div>
                       )}
                     </>
                   )}

@@ -166,20 +166,20 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
 
     let checklistItems;
     if (orgItems && orgItems.length > 0) {
-      // Build a quick lookup from template for sub_section / phase metadata
       const tmplMeta = {};
       CHECKLIST_TEMPLATE.forEach((t) => { tmplMeta[t.item_id] = { sub_section: t.sub_section, phase: t.phase }; });
-      checklistItems = orgItems.map((item) => ({
+      checklistItems = orgItems.map((item, idx) => ({
         project_id: project.id,
         item_id: item.item_id,
         category: item.category,
-        sub_section: tmplMeta[item.item_id]?.sub_section || null,
+        sub_section: item.section || tmplMeta[item.item_id]?.sub_section || null,
         phase: tmplMeta[item.item_id]?.phase || null,
         item_text: item.item_text,
         status: "pending",
+        sort_order: idx,
       }));
     } else {
-      checklistItems = CHECKLIST_TEMPLATE.map((item) => ({
+      checklistItems = CHECKLIST_TEMPLATE.map((item, idx) => ({
         project_id: project.id,
         item_id: item.item_id,
         category: item.category,
@@ -187,6 +187,7 @@ export default function CreateProjectModal({ onClose, onCreated, userId, org }) 
         phase: item.phase || null,
         item_text: item.text,
         status: "pending",
+        sort_order: idx,
       }));
     }
 
