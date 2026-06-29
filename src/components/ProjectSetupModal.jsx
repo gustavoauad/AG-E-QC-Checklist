@@ -38,6 +38,7 @@ function buildSortOrder(catItems, sectionOrder) {
 }
 
 function ChecklistsTab({ project, userRole }) {
+  const isMobile = useIsMobile();
   const canEdit = userRole === "project_manager" || userRole === "qaqc";
   const [config, setConfig] = useState({});
   const [items, setItems] = useState({});
