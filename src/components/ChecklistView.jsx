@@ -794,8 +794,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                   }}>
                     <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
                     <span style={{ fontSize: "10px", fontWeight: "600", flexShrink: 0, marginLeft: "6px",
-                      color: isActive ? "rgba(255,255,255,0.85)" : isDone ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
-                      {done}/{applicable}
+                      color: isActive ? "rgba(255,255,255,0.85)" : isDone ? "var(--c-ok-text)" : "var(--c-text-3)",
+                      textAlign: "right", lineHeight: 1.3 }}>
+                      {done}/{applicable}<br/>{pct}%
                     </span>
                   </button>
                 );
@@ -820,8 +821,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                         {milestoneItemsCache[m.id] ? (() => {
                           const ms = getMilestoneStats(m.id);
                           return (
-                            <span style={{ fontSize: "10px", fontWeight: "600", color: isActive ? "rgba(255,255,255,0.85)" : ms.done === ms.applicable && ms.applicable > 0 ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
-                              {ms.done}/{ms.applicable}
+                            <span style={{ fontSize: "10px", fontWeight: "600", textAlign: "right", lineHeight: 1.3,
+                              color: isActive ? "rgba(255,255,255,0.85)" : ms.done === ms.applicable && ms.applicable > 0 ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
+                              {ms.done}/{ms.applicable}<br/>{ms.pct}%
                             </span>
                           );
                         })() : null}
