@@ -660,62 +660,59 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           {/* Row 3: Attribution + milestone due dates */}
           {(() => {
             const dueInfos = getItemDueInfo(item.id);
-            const today3 = new Date(); today3.setHours(0, 0, 0, 0);
-            const showDue = status !== "complete" && status !== "na";
+            const showUrgency = status !== "complete" && status !== "na";
+            const msIds = itemMsIdMap[item.id] || [];
             const hasAny = (status === "complete" && completedByName) ||
               (status === "in_progress" && inProgressByName) ||
-              milestones.length > 0;
+              msIds.length > 0 ||
+              (milestones.length > 0 && msIds.length === 0);
             if (!hasAny) return null;
             return (
-              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px", marginTop: "2px" }}>
+              <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "6px", marginTop: "4px" }}>
                 {status === "complete" && completedByName && (
-                  <span style={{ fontSize: "11px", color: "var(--c-ok-text)", flexShrink: 0 }}>
+                  <span style={{ fontSize: "11px", color: "var(--c-ok-text)", flexShrink: 0, marginRight: "2px" }}>
                     ✓ {completedByName} · {formatDate(item.completed_at)}
                   </span>
                 )}
                 {status === "in_progress" && inProgressByName && (
-                  <span style={{ fontSize: "11px", color: "var(--c-purple)", flexShrink: 0 }}>
+                  <span style={{ fontSize: "11px", color: "var(--c-purple)", flexShrink: 0, marginRight: "2px" }}>
                     ▶ {inProgressByName} · {formatDate(item.in_progress_at)}
                   </span>
                 )}
-                {milestones.length > 0 && msList.length === 0 && (
-                  <span style={{ fontSize: "10px", color: "var(--c-err)", background: "var(--c-err-bg)", border: "1px solid #7f1d1d", borderRadius: "3px", padding: "2px 7px" }}>⚠ not assigned to milestone</span>
+                {milestones.length > 0 && msIds.length === 0 && (
+                  <span style={{ fontSize: "10px", color: "var(--c-text-4)", fontStyle: "italic" }}>no milestone</span>
                 )}
-                {/* Per-milestone due date chips */}
-                {msList.map((name) => {
-                  const msId = (itemMsIdMap[item.id] || []).find((id) => milestones.find((m) => m.id === id)?.name === name);
+                {msIds.map((msId) => {
+                  const ms = milestones.find((m) => m.id === msId);
+                  if (!ms) return null;
                   const info = dueInfos.find((d) => d.milestoneId === msId);
-                  if (!info || !showDue) {
-                    // No days_before set — show plain milestone chip
+                  // Completed/NA or no days_before configured — muted name chip
+                  if (!showUrgency || !info) {
                     return (
-                      <span key={name} style={{ fontSize: "10px", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", border: "1px solid #0095da", borderRadius: "3px", padding: "2px 7px" }}>
-                        📅 {name}
+                      <span key={msId} style={{ fontSize: "10px", fontWeight: "500", color: "var(--c-text-4)", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "4px", padding: "2px 7px", whiteSpace: "nowrap" }}>
+                        {ms.name}
                       </span>
                     );
                   }
                   const isPast = info.daysLeft < 0;
                   const isSoon = info.daysLeft >= 0 && info.daysLeft <= 7;
                   const color = isPast ? "var(--c-err)" : isSoon ? "var(--c-warn)" : "var(--c-text-3)";
-                  const bg = isPast ? "var(--c-err-bg)" : isSoon ? "var(--c-warn-bg)" : "var(--c-surface)";
+                  const bg = isPast ? "var(--c-err-bg)" : isSoon ? "var(--c-warn-bg)" : "transparent";
                   const border = isPast ? "#7f1d1d" : isSoon ? "var(--c-warn)" : "var(--c-border)";
-                  const dayLabel = isPast
-                    ? `${Math.abs(info.daysLeft)}d overdue`
-                    : info.daysLeft === 0
-                    ? "due today"
-                    : `${info.daysLeft}d left`;
+                  const dueStr = info.dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+                  const dayLabel = isPast ? `${Math.abs(info.daysLeft)}d overdue` : info.daysLeft === 0 ? "today" : `${info.daysLeft}d`;
                   return (
-                    <span key={name} title={`Due ${info.dueDate.toLocaleDateString()} — ${info.daysLeft >= 0 ? info.daysLeft : 0}d before ${name} (${info.msDate.toLocaleDateString()})`}
-                      style={{ fontSize: "10px", fontWeight: isSoon || isPast ? "700" : "500", color, background: bg, border: `1px solid ${border}`, borderRadius: "3px", padding: "2px 8px", whiteSpace: "nowrap" }}>
-                      {isPast ? "⚠ " : isSoon ? "⏰ " : "📅 "}{name} · {info.dueDate.toLocaleDateString(undefined, { month: "short", day: "numeric" })} · {dayLabel}
+                    <span key={msId}
+                      title={`Due ${dueStr} (${info.daysLeft >= 0 ? info.daysLeft + "d before" : Math.abs(info.daysLeft) + "d past"} ${ms.name} on ${ms.date})`}
+                      style={{ fontSize: "10px", fontWeight: isPast || isSoon ? "600" : "400", color, background: bg, border: `1px solid ${border}`, borderRadius: "4px", padding: "2px 8px", whiteSpace: "nowrap", display: "inline-flex", alignItems: "center", gap: "4px" }}>
+                      <span style={{ fontWeight: "700" }}>{isPast ? "⚠ " : isSoon ? "⏰ " : ""}{ms.name}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span>{dueStr}</span>
+                      <span style={{ opacity: 0.4 }}>·</span>
+                      <span style={{ fontWeight: "700" }}>{dayLabel}</span>
                     </span>
                   );
                 })}
-                {/* Completed items: show milestone names without due urgency */}
-                {!showDue && msList.map((name) => (
-                  <span key={name} style={{ fontSize: "10px", background: "var(--c-surface)", color: "var(--c-text-4)", border: "1px solid var(--c-border)", borderRadius: "3px", padding: "2px 7px" }}>
-                    📅 {name}
-                  </span>
-                ))}
               </div>
             );
           })()}
@@ -1094,7 +1091,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             const today = new Date(); today.setHours(0,0,0,0);
             const inProgressItems = checklists.filter((c) => c.status === "in_progress");
             const itemsWithDue = checklists
-              .filter((c) => c.days_before_milestone && c.status !== "complete" && c.status !== "na")
+              .filter((c) => c.status !== "complete" && c.status !== "na")
               .map((c) => ({ ...c, dueDate: getItemDueDate(c) }))
               .filter((c) => c.dueDate);
             const pastDueItems = itemsWithDue.filter((c) => c.dueDate < today);
