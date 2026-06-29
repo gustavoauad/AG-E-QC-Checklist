@@ -369,22 +369,21 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             {/* Push status buttons and comment to the right */}
             <div style={{ flex: 1 }} />
 
-            {/* Status action buttons */}
+            {/* Status action buttons — toggle on/off, pending is implicit default */}
             {editable && (
               <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
                 {[
-                  { s: "complete",    label: "✓",    title: "Mark Complete" },
-                  { s: "in_progress", label: "▶",    title: "Mark In Progress" },
-                  { s: "na",          label: "N/A",  title: "Mark N/A" },
-                  { s: "pending",     label: "—",    title: "Mark Pending" },
+                  { s: "complete",    label: "✓",   title: "Complete" },
+                  { s: "in_progress", label: "▶",   title: "In Progress" },
+                  { s: "na",          label: "N/A", title: "N/A" },
                 ].map(({ s, label, title }) => {
                   const btn = statusColors[s];
                   const isActive = status === s;
                   return (
                     <button key={s}
-                      onClick={() => !isUpdating && handleStatusChange(item, s)}
+                      onClick={() => !isUpdating && handleStatusChange(item, isActive ? "pending" : s)}
                       disabled={isUpdating}
-                      title={title}
+                      title={isActive ? `Remove ${title}` : `Mark ${title}`}
                       style={{
                         padding: isMobile ? "4px 7px" : "4px 10px",
                         border: `1px solid ${isActive ? btn.border : "var(--c-border)"}`,
