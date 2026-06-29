@@ -220,6 +220,8 @@ function ChecklistsTab({ org, orgRole }) {
   const [renameText, setRenameText] = useState("");
   const [editingItemId, setEditingItemId] = useState(null);
   const [editItemText, setEditItemText] = useState("");
+  const [editItemHelpText, setEditItemHelpText] = useState("");
+  const [editItemDays, setEditItemDays] = useState("");
   const [addingTo, setAddingTo] = useState(null); // { catId, section: string|null }
   const [newItemText, setNewItemText] = useState("");
   const [addingCat, setAddingCat] = useState(false);
@@ -312,7 +314,7 @@ function ChecklistsTab({ org, orgRole }) {
       p_project_ids: [...selectedProjIds],
       p_category:    catId,
       p_label:       catLabel,
-      p_items:       sortedItems.map((i) => ({ item_id: i.item_id, item_text: i.item_text, section: i.section || null })),
+      p_items:       sortedItems.map((i) => ({ item_id: i.item_id, item_text: i.item_text, section: i.section || null, help_text: i.help_text || null, days_before_milestone: i.days_before_milestone || null })),
       p_action:      action,
     });
 
@@ -431,8 +433,13 @@ function ChecklistsTab({ org, orgRole }) {
 
   const saveItemEdit = async (item) => {
     if (!editItemText.trim()) { setEditingItemId(null); return; }
-    await supabase.from("org_checklist_items").update({ item_text: editItemText.trim() }).eq("id", item.id);
-    setItems((p) => ({ ...p, [item.category]: p[item.category].map((i) => i.id === item.id ? { ...i, item_text: editItemText.trim() } : i) }));
+    const updates = {
+      item_text: editItemText.trim(),
+      help_text: editItemHelpText.trim() || null,
+      days_before_milestone: editItemDays !== "" ? parseInt(editItemDays, 10) : null,
+    };
+    await supabase.from("org_checklist_items").update(updates).eq("id", item.id);
+    setItems((p) => ({ ...p, [item.category]: p[item.category].map((i) => i.id === item.id ? { ...i, ...updates } : i) }));
     setEditingItemId(null);
   };
 
@@ -824,13 +831,30 @@ function ChecklistsTab({ org, orgRole }) {
                                       <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
                                     )}
                                     {editingItemId === item.id ? (
-                                      <input autoFocus value={editItemText}
-                                        onChange={(e) => setEditItemText(e.target.value)}
-                                        onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                        style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
-                                      />
+                                      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                                        <input autoFocus value={editItemText}
+                                          onChange={(e) => setEditItemText(e.target.value)}
+                                          onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
+                                          placeholder="Item text"
+                                          style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
+                                        />
+                                        <input value={editItemHelpText}
+                                          onChange={(e) => setEditItemHelpText(e.target.value)}
+                                          placeholder="Help text (optional tooltip)"
+                                          style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #334155", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px" }}
+                                        />
+                                        <input type="number" min="0" value={editItemDays}
+                                          onChange={(e) => setEditItemDays(e.target.value)}
+                                          placeholder="Days before milestone (due-date offset)"
+                                          style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #334155", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px", width: "220px" }}
+                                        />
+                                      </div>
                                     ) : (
-                                      <span style={{ flex: 1, color: "var(--c-text-4)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                      <div style={{ flex: 1 }}>
+                                        <span style={{ color: "var(--c-text-4)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                        {item.help_text && <div style={{ fontSize: "11px", color: "var(--c-text-3)", marginTop: "2px" }}>ⓘ {item.help_text}</div>}
+                                        {item.days_before_milestone && <div style={{ fontSize: "10px", color: "var(--c-accent-lt)", marginTop: "2px" }}>📅 {item.days_before_milestone}d before milestone</div>}
+                                      </div>
                                     )}
                                     {orgRole === "admin" && (
                                       <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
@@ -841,7 +865,7 @@ function ChecklistsTab({ org, orgRole }) {
                                           </>
                                         ) : (
                                           <>
-                                            <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
+                                            <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); setEditItemHelpText(item.help_text || ""); setEditItemDays(item.days_before_milestone ?? ""); }} style={mBtn()}>Edit</button>
                                             <button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>✕</button>
                                           </>
                                         )}
@@ -924,13 +948,30 @@ function ChecklistsTab({ org, orgRole }) {
                                           <span style={{ color: "var(--c-text-4)", fontSize: "13px", cursor: "grab", userSelect: "none", flexShrink: 0 }}>⠿</span>
                                         )}
                                         {editingItemId === item.id ? (
-                                          <input autoFocus value={editItemText}
-                                            onChange={(e) => setEditItemText(e.target.value)}
-                                            onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
-                                            style={{ flex: 1, padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
-                                          />
+                                          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "4px" }}>
+                                            <input autoFocus value={editItemText}
+                                              onChange={(e) => setEditItemText(e.target.value)}
+                                              onKeyDown={(e) => { if (e.key === "Enter") saveItemEdit(item); if (e.key === "Escape") setEditingItemId(null); }}
+                                              placeholder="Item text"
+                                              style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #0095da", borderRadius: "4px", color: "var(--c-text)", fontSize: "13px" }}
+                                            />
+                                            <input value={editItemHelpText}
+                                              onChange={(e) => setEditItemHelpText(e.target.value)}
+                                              placeholder="Help text (optional tooltip)"
+                                              style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #334155", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px" }}
+                                            />
+                                            <input type="number" min="0" value={editItemDays}
+                                              onChange={(e) => setEditItemDays(e.target.value)}
+                                              placeholder="Days before milestone"
+                                              style={{ padding: "3px 8px", background: "var(--c-bg)", border: "1px solid #334155", borderRadius: "4px", color: "var(--c-text)", fontSize: "12px", width: "220px" }}
+                                            />
+                                          </div>
                                         ) : (
-                                          <span style={{ flex: 1, color: "var(--c-text-2)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                          <div style={{ flex: 1 }}>
+                                            <span style={{ color: "var(--c-text-2)", fontSize: "13px", lineHeight: 1.4 }}>{item.item_text}</span>
+                                            {item.help_text && <div style={{ fontSize: "11px", color: "var(--c-text-3)", marginTop: "2px" }}>ⓘ {item.help_text}</div>}
+                                            {item.days_before_milestone && <div style={{ fontSize: "10px", color: "var(--c-accent-lt)", marginTop: "2px" }}>📅 {item.days_before_milestone}d before milestone</div>}
+                                          </div>
                                         )}
                                         {orgRole === "admin" && (
                                           <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
@@ -941,7 +982,7 @@ function ChecklistsTab({ org, orgRole }) {
                                               </>
                                             ) : (
                                               <>
-                                                <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); }} style={mBtn()}>Edit</button>
+                                                <button onClick={() => { setEditingItemId(item.id); setEditItemText(item.item_text); setEditItemHelpText(item.help_text || ""); setEditItemDays(item.days_before_milestone ?? ""); }} style={mBtn()}>Edit</button>
                                                 <button onClick={() => removeItem(item)} style={mBtn({ color: "var(--c-err)" })}>✕</button>
                                               </>
                                             )}

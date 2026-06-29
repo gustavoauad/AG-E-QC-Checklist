@@ -8,6 +8,7 @@ const roleColors = {
   project_manager: { color: "var(--c-accent-lt)", label: "PM" },
   engineer:        { color: "var(--c-ok-text)", label: "Engineer" },
   drafter:         { color: "var(--c-purple)", label: "Drafter" },
+  qaqc:            { color: "var(--c-warn)", label: "QA/QC" },
 };
 
 export default function ProjectsDashboard({ session, org, orgRole, onSelectProject }) {

@@ -35,7 +35,7 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
           onBack={() => { setSelectedProject(null); setUserRole(null); }}
           onSignOut={onSignOut}
           onGoToProjects={() => { setSelectedProject(null); setUserRole(null); setSection("projects"); }}
-          onOpenSetup={userRole === "project_manager" ? () => setSetupFromChecklist(true) : null}
+          onOpenSetup={(userRole === "project_manager" || userRole === "qaqc") ? () => setSetupFromChecklist(true) : null}
         />
         {setupFromChecklist && (
           <ProjectSetupModal

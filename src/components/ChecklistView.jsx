@@ -22,9 +22,14 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const [activeMilestoneId, setActiveMilestoneId] = useState(null);
   const [milestoneItemsCache, setMilestoneItemsCache] = useState({});
   const [milestoneLoading, setMilestoneLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("all"); // all | pending | complete | na
+  const [filterStatus, setFilterStatus] = useState("all"); // all | pending | complete | na | in_progress
   const [filterMilestoneId, setFilterMilestoneId] = useState("all");
   const [filterApplicable, setFilterApplicable] = useState(false);
+  const [helpPopover, setHelpPopover] = useState(null); // item.id
+  const [itemMsIdMap, setItemMsIdMap] = useState({}); // itemId → [milestoneId, ...]
+  const [dashboardView, setDashboardView] = useState(false);
+  const [qaqcAlerts, setQaqcAlerts] = useState([]); // flagged comments
+  const [qaqcAlertsLoaded, setQaqcAlertsLoaded] = useState(false);
 
   useEffect(() => { fetchAll(); }, []);
 
@@ -73,6 +78,12 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
         if (msName) imMap[checklist_item_id].push(msName);
       });
       setItemMsMap(imMap);
+      const imIdMap = {};
+      (miData || []).forEach(({ milestone_id, checklist_item_id }) => {
+        if (!imIdMap[checklist_item_id]) imIdMap[checklist_item_id] = [];
+        imIdMap[checklist_item_id].push(milestone_id);
+      });
+      setItemMsIdMap(imIdMap);
     }
     const userIds = (memberRes.data || []).map((r) => r.user_id);
     if (userIds.length > 0) {
@@ -149,20 +160,37 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
   const canEdit = (category) => {
     if (userRole === "project_manager") return true;
+    if (userRole === "qaqc") return true;
     if (userRole === "engineer") return category !== "drafting";
     if (userRole === "drafter") return category === "drafting";
     return false;
   };
 
+  const getItemDueDate = (item) => {
+    if (!item.days_before_milestone) return null;
+    const msIds = itemMsIdMap[item.id] || [];
+    if (!msIds.length) return null;
+    const dates = msIds.map((id) => {
+      const m = milestones.find((x) => x.id === id);
+      if (!m?.date) return null;
+      const msDate = new Date(m.date + "T00:00:00");
+      return new Date(msDate.getTime() - item.days_before_milestone * 86400000);
+    }).filter(Boolean);
+    return dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))) : null;
+  };
+
   const handleStatusChange = async (item, newStatus) => {
     if (!canEdit(item.category)) return;
     setUpdating(item.id);
+    const now = new Date().toISOString();
     const updates = {
       status: newStatus,
       updated_by: session.user.id,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
       completed_by: newStatus === "complete" ? session.user.id : null,
-      completed_at: newStatus === "complete" ? new Date().toISOString() : null,
+      completed_at: newStatus === "complete" ? now : null,
+      in_progress_by: newStatus === "in_progress" ? session.user.id : null,
+      in_progress_at: newStatus === "in_progress" ? now : null,
     };
     const { error } = await supabase.from("checklists").update(updates).eq("id", item.id);
     if (!error) setChecklists((prev) => prev.map((c) => c.id === item.id ? { ...c, ...updates } : c));
@@ -193,12 +221,32 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     setAddingComment(true);
     const { data, error } = await supabase.from("checklist_comments").insert({
       checklist_item_id: itemId, user_id: session.user.id, comment: commentText.trim(),
+      is_qaqc_flagged: userRole === "qaqc",
     }).select().single();
     if (!error && data) {
       setCommentsCache((prev) => ({ ...prev, [itemId]: [...(prev[itemId] || []), data] }));
       setCommentText("");
     }
     setAddingComment(false);
+  };
+
+  const loadQaqcAlerts = async () => {
+    if (qaqcAlertsLoaded) return;
+    const itemIds = checklists.map((c) => c.id);
+    if (!itemIds.length) { setQaqcAlertsLoaded(true); return; }
+    const { data } = await supabase
+      .from("checklist_comments")
+      .select("*, checklist:checklists(item_text, category)")
+      .eq("is_qaqc_flagged", true)
+      .in("checklist_item_id", itemIds)
+      .order("created_at", { ascending: false });
+    const alerts = (data || []).map((c) => ({
+      ...c,
+      authorName: profilesMap[c.user_id]?.full_name || "QAQC",
+      itemText: c.checklist?.item_text || "",
+    }));
+    setQaqcAlerts(alerts);
+    setQaqcAlertsLoaded(true);
   };
 
   const deleteComment = async (itemId, commentId) => {
@@ -243,9 +291,10 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
   const overallProgress = applicableItems ? Math.round((completedItems / applicableItems) * 100) : 0;
 
   const statusColors = {
-    complete: { bg: "var(--c-ok-bg)", border: "var(--c-ok)", color: "var(--c-ok-text)", label: isMobile ? "✓" : "Complete" },
-    na:       { bg: "var(--c-neutral-bg)", border: "var(--c-neutral)", color: "var(--c-neutral-text)", label: "N/A" },
-    pending:  { bg: "var(--c-surface-alt)", border: "var(--c-border)", color: "var(--c-text-2)", label: isMobile ? "—" : "Pending" },
+    complete:    { bg: "var(--c-ok-bg)", border: "var(--c-ok)", color: "var(--c-ok-text)", label: "Complete" },
+    in_progress: { bg: "var(--c-purple-bg)", border: "var(--c-purple)", color: "var(--c-purple)", label: "In Progress" },
+    na:          { bg: "var(--c-neutral-bg)", border: "var(--c-neutral)", color: "var(--c-neutral-text)", label: "N/A" },
+    pending:     { bg: "var(--c-surface-alt)", border: "var(--c-border)", color: "var(--c-text-2)", label: "Pending" },
   };
 
   const formatDate = (iso) => iso
@@ -285,10 +334,17 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     const status = item.status || "pending";
     const isUpdating = updating === item.id;
     const completedByName = item.completed_by ? (profilesMap[item.completed_by]?.full_name || "Unknown") : null;
+    const inProgressByName = item.in_progress_by ? (profilesMap[item.in_progress_by]?.full_name || "Unknown") : null;
     const comments = commentsCache[item.id] || [];
     const isCommentsOpen = openComments === item.id;
-    const sc = statusColors[status];
+    const sc = statusColors[status] || statusColors.pending;
     const msList = itemMsMap[item.id] || [];
+    const dueDate = getItemDueDate(item);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dueDaysLeft = dueDate ? Math.ceil((dueDate - today) / 86400000) : null;
+    const isPastDue = dueDate && dueDate < today && status !== "complete" && status !== "na";
+    const isDueSoon = dueDate && dueDaysLeft >= 0 && dueDaysLeft <= 7 && status !== "complete" && status !== "na";
+    const isHelpOpen = helpPopover === item.id;
 
     return (
       <div key={item.id} style={{
@@ -306,7 +362,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             )}
             {/* Current status as read badge */}
             <span style={{ fontSize: "10px", fontWeight: "700", color: sc.color, background: sc.bg, border: `1px solid ${sc.border}`, borderRadius: "20px", padding: "2px 10px", flexShrink: 0 }}>
-              {status === "complete" ? "Complete" : status === "na" ? "N/A" : "Pending"}
+              {sc.label}
             </span>
             {item.is_custom && <span style={{ fontSize: "10px", color: "var(--c-purple)", background: "var(--c-purple-bg)", padding: "2px 7px", borderRadius: "20px" }}>custom</span>}
             {item.edited_by_pm && <span style={{ fontSize: "10px", color: "var(--c-warn)", background: "var(--c-warn-bg)", padding: "2px 7px", borderRadius: "20px" }}>✏ edited</span>}
@@ -317,16 +373,21 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             {/* Status action buttons */}
             {editable && (
               <div style={{ display: "flex", gap: "4px", flexShrink: 0 }}>
-                {["complete", "na", "pending"].map((s) => {
+                {[
+                  { s: "complete",    label: "✓",    title: "Mark Complete" },
+                  { s: "in_progress", label: "▶",    title: "Mark In Progress" },
+                  { s: "na",          label: "N/A",  title: "Mark N/A" },
+                  { s: "pending",     label: "—",    title: "Mark Pending" },
+                ].map(({ s, label, title }) => {
                   const btn = statusColors[s];
                   const isActive = status === s;
                   return (
                     <button key={s}
                       onClick={() => !isUpdating && handleStatusChange(item, s)}
                       disabled={isUpdating}
-                      title={s === "complete" ? "Mark Complete" : s === "na" ? "Mark N/A" : "Mark Pending"}
+                      title={title}
                       style={{
-                        padding: isMobile ? "4px 8px" : "4px 12px",
+                        padding: isMobile ? "4px 7px" : "4px 10px",
                         border: `1px solid ${isActive ? btn.border : "var(--c-border)"}`,
                         borderRadius: "6px", fontSize: "11px", fontWeight: "600",
                         background: isActive ? btn.bg : "transparent",
@@ -334,7 +395,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                         cursor: isUpdating ? "not-allowed" : "pointer",
                         transition: "all 0.1s",
                       }}>
-                      {s === "complete" ? "✓" : s === "na" ? "N/A" : "—"}
+                      {label}
                     </button>
                   );
                 })}
@@ -346,7 +407,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
             {/* Comment button */}
             <button onClick={() => toggleComments(item.id)} style={{
-              flexShrink: 0,
+              flexShrink: 0, position: "relative",
               background: isCommentsOpen ? "var(--c-accent-dk)" : "transparent",
               border: `1px solid ${isCommentsOpen ? "var(--c-accent)" : "var(--c-border)"}`,
               color: isCommentsOpen ? "var(--c-accent-lt)" : "var(--c-text-3)",
@@ -354,7 +415,32 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
               fontSize: "11px", cursor: "pointer", whiteSpace: "nowrap",
             }}>
               💬{comments.length > 0 ? ` ${comments.length}` : ""}
+              {comments.some((c) => c.is_qaqc_flagged) && (
+                <span style={{ position: "absolute", top: "-4px", right: "-4px", width: "8px", height: "8px", background: "var(--c-warn)", borderRadius: "50%", border: "2px solid var(--c-bg)" }} />
+              )}
             </button>
+
+            {/* Help popover button */}
+            {item.help_text && (
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                <button onClick={() => setHelpPopover(isHelpOpen ? null : item.id)} title="More info" style={{
+                  background: isHelpOpen ? "var(--c-accent-dk)" : "transparent",
+                  border: `1px solid ${isHelpOpen ? "var(--c-accent)" : "var(--c-border)"}`,
+                  color: isHelpOpen ? "var(--c-accent-lt)" : "var(--c-text-3)",
+                  borderRadius: "6px", padding: "4px 8px", fontSize: "13px", cursor: "pointer",
+                }}>ⓘ</button>
+                {isHelpOpen && (
+                  <div style={{
+                    position: "absolute", right: 0, top: "calc(100% + 6px)", zIndex: 100,
+                    background: "var(--c-surface)", border: "1px solid var(--c-accent)", borderRadius: "8px",
+                    padding: "10px 14px", width: "260px", fontSize: "12px", lineHeight: "1.5",
+                    color: "var(--c-text-2)", boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                  }}>
+                    {item.help_text}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Row 2: Item description */}
@@ -366,11 +452,27 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             {item.item_text}
           </p>
 
-          {/* Row 3: Completed by + milestones */}
+          {/* Row 3: Attribution + due date + milestones */}
           <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "8px" }}>
             {status === "complete" && completedByName && (
               <span style={{ fontSize: "11px", color: "var(--c-ok-text)", flexShrink: 0 }}>
                 ✓ {completedByName} · {formatDate(item.completed_at)}
+              </span>
+            )}
+            {status === "in_progress" && inProgressByName && (
+              <span style={{ fontSize: "11px", color: "var(--c-purple)", flexShrink: 0 }}>
+                ▶ {inProgressByName} · {formatDate(item.in_progress_at)}
+              </span>
+            )}
+            {dueDate && status !== "complete" && status !== "na" && (
+              <span style={{
+                fontSize: "10px", fontWeight: "700", flexShrink: 0,
+                color: isPastDue ? "var(--c-err)" : isDueSoon ? "var(--c-warn)" : "var(--c-text-3)",
+                background: isPastDue ? "var(--c-err-bg)" : isDueSoon ? "var(--c-warn-bg)" : "transparent",
+                border: `1px solid ${isPastDue ? "#7f1d1d" : isDueSoon ? "var(--c-warn)" : "var(--c-border)"}`,
+                borderRadius: "3px", padding: "2px 7px",
+              }}>
+                {isPastDue ? "⚠ PAST DUE" : isDueSoon ? `⚠ due in ${dueDaysLeft}d` : `due ${formatDate(dueDate.toISOString())}`}
               </span>
             )}
             {milestones.length > 0 && (
@@ -395,11 +497,18 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
             ) : (
               <div style={{ display: "grid", gap: "8px", marginBottom: "12px" }}>
                 {comments.map((c) => (
-                  <div key={c.id} style={{ background: "var(--c-surface)", borderRadius: "8px", padding: "10px 12px" }}>
+                  <div key={c.id} style={{ background: "var(--c-surface)", borderRadius: "8px", padding: "10px 12px", border: c.is_qaqc_flagged ? "1px solid var(--c-warn)" : "none" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
-                      <span style={{ fontSize: "12px", color: "var(--c-accent-lt)", fontWeight: "600" }}>
-                        {profilesMap[c.user_id]?.full_name || "Unknown"}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                        <span style={{ fontSize: "12px", color: "var(--c-accent-lt)", fontWeight: "600" }}>
+                          {profilesMap[c.user_id]?.full_name || "Unknown"}
+                        </span>
+                        {c.is_qaqc_flagged && (
+                          <span style={{ fontSize: "10px", color: "var(--c-warn)", background: "var(--c-warn-bg)", border: "1px solid var(--c-warn)", borderRadius: "20px", padding: "1px 7px", fontWeight: "700" }}>
+                            QA/QC
+                          </span>
+                        )}
+                      </div>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                         <span style={{ fontSize: "11px", color: "var(--c-text-3)" }}>{formatDate(c.created_at)}</span>
                         {c.user_id === session.user.id && (
@@ -541,8 +650,15 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
       {/* View mode toggle */}
       <div style={{ background: "var(--c-surface)", borderBottom: "1px solid #334155", padding: "0 16px", display: "flex" }}>
-        {[{ id: "category", label: "By Category" }, { id: "milestone", label: "By Milestone" }].map(({ id, label }) => (
-          <button key={id} onClick={() => handleViewModeToggle(id)} style={{
+        {[
+          { id: "category",  label: "By Category" },
+          { id: "milestone", label: "By Milestone" },
+          { id: "dashboard", label: "📊 Dashboard" },
+        ].map(({ id, label }) => (
+          <button key={id} onClick={async () => {
+            if (id === "dashboard") { setViewMode("dashboard"); await loadQaqcAlerts(); }
+            else handleViewModeToggle(id);
+          }} style={{
             padding: "10px 16px", border: "none", background: "transparent", cursor: "pointer",
             fontSize: "13px", fontWeight: viewMode === id ? "600" : "400",
             color: viewMode === id ? "var(--c-accent)" : "var(--c-text-3)",
@@ -591,10 +707,11 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
 
         {/* Status filter */}
         {[
-          { id: "all", label: "All Status" },
-          { id: "pending", label: "Pending" },
-          { id: "complete", label: "Complete" },
-          { id: "na", label: "N/A" },
+          { id: "all",         label: "All Status" },
+          { id: "pending",     label: "Pending" },
+          { id: "in_progress", label: "In Progress" },
+          { id: "complete",    label: "Complete" },
+          { id: "na",          label: "N/A" },
         ].map(({ id, label }) => (
           <button key={id} onClick={() => setFilterStatus(id)} style={{
             padding: isMobile ? "4px 10px" : "4px 12px", borderRadius: "20px", border: "1px solid",
@@ -693,7 +810,104 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
         <div style={{ flex: 1, overflowY: "auto", padding: isMobile ? "16px" : "24px" }}>
           {loading ? (
             <p style={{ color: "var(--c-text-2)" }}>Loading checklist...</p>
-          ) : viewMode === "category" ? (
+          ) : viewMode === "dashboard" ? (() => {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const inProgressItems = checklists.filter((c) => c.status === "in_progress");
+            const itemsWithDue = checklists
+              .filter((c) => c.days_before_milestone && c.status !== "complete" && c.status !== "na")
+              .map((c) => ({ ...c, dueDate: getItemDueDate(c) }))
+              .filter((c) => c.dueDate);
+            const pastDueItems = itemsWithDue.filter((c) => c.dueDate < today);
+            const dueSoonItems = itemsWithDue.filter((c) => {
+              const diff = Math.ceil((c.dueDate - today) / 86400000);
+              return diff >= 0 && diff <= 7;
+            });
+            const statCard = (label, value, color) => (
+              <div key={label} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "10px", padding: "16px 20px", textAlign: "center" }}>
+                <div style={{ fontSize: "28px", fontWeight: "800", color: color || "var(--c-text)" }}>{value}</div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.05em", marginTop: "4px" }}>{label}</div>
+              </div>
+            );
+            const DueList = ({ items, title, color }) => items.length === 0 ? null : (
+              <div style={{ marginBottom: "24px" }}>
+                <h3 style={{ color: color, margin: "0 0 10px", fontSize: "14px", fontWeight: "700" }}>{title}</h3>
+                <div style={{ display: "grid", gap: "6px" }}>
+                  {items.map((c) => {
+                    const dLeft = Math.ceil((c.dueDate - today) / 86400000);
+                    return (
+                      <div key={c.id} style={{ background: "var(--c-surface)", border: `1px solid ${color}`, borderRadius: "8px", padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "10px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ fontSize: "10px", color: "var(--c-text-4)", fontFamily: "monospace" }}>{refCodes[c.id]} </span>
+                          <span style={{ fontSize: "13px", color: "var(--c-text)" }}>{c.item_text}</span>
+                        </div>
+                        <span style={{ fontSize: "10px", fontWeight: "700", color, flexShrink: 0 }}>
+                          {dLeft < 0 ? `${Math.abs(dLeft)}d overdue` : dLeft === 0 ? "due today" : `${dLeft}d left`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+            return (
+              <>
+                <h2 style={{ color: "var(--c-text)", margin: "0 0 20px", fontSize: "18px" }}>Project Dashboard</h2>
+                {/* Stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "10px", marginBottom: "28px" }}>
+                  {statCard("Total", totalItems, "var(--c-text)")}
+                  {statCard("Complete", completedItems, "var(--c-ok-text)")}
+                  {statCard("In Progress", inProgressItems.length, "var(--c-purple)")}
+                  {statCard("Pending", pendingItems, "var(--c-text-2)")}
+                  {statCard("N/A", naItems, "var(--c-text-4)")}
+                  {statCard("Progress", `${overallProgress}%`, overallProgress === 100 ? "var(--c-ok-text)" : "var(--c-accent)")}
+                </div>
+                {/* Past due */}
+                <DueList items={pastDueItems} title={`⚠ Past Due (${pastDueItems.length})`} color="var(--c-err)" />
+                {/* Due soon */}
+                <DueList items={dueSoonItems} title={`⏰ Due Soon — next 7 days (${dueSoonItems.length})`} color="var(--c-warn)" />
+                {/* In progress */}
+                {inProgressItems.length > 0 && (
+                  <div style={{ marginBottom: "24px" }}>
+                    <h3 style={{ color: "var(--c-purple)", margin: "0 0 10px", fontSize: "14px", fontWeight: "700" }}>▶ In Progress ({inProgressItems.length})</h3>
+                    <div style={{ display: "grid", gap: "6px" }}>
+                      {inProgressItems.map((c) => (
+                        <div key={c.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-purple)", borderRadius: "8px", padding: "10px 14px" }}>
+                          <span style={{ fontSize: "10px", color: "var(--c-text-4)", fontFamily: "monospace" }}>{refCodes[c.id]} </span>
+                          <span style={{ fontSize: "13px", color: "var(--c-text)" }}>{c.item_text}</span>
+                          {c.in_progress_by && (
+                            <div style={{ fontSize: "11px", color: "var(--c-purple)", marginTop: "4px" }}>
+                              ▶ {profilesMap[c.in_progress_by]?.full_name || "Unknown"} · {formatDate(c.in_progress_at)}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* QAQC alerts */}
+                {qaqcAlerts.length > 0 && (
+                  <div style={{ marginBottom: "24px" }}>
+                    <h3 style={{ color: "var(--c-warn)", margin: "0 0 10px", fontSize: "14px", fontWeight: "700" }}>🚩 QA/QC Flagged Comments ({qaqcAlerts.length})</h3>
+                    <div style={{ display: "grid", gap: "8px" }}>
+                      {qaqcAlerts.map((c) => (
+                        <div key={c.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-warn)", borderRadius: "8px", padding: "10px 14px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                            <span style={{ fontSize: "12px", color: "var(--c-warn)", fontWeight: "700" }}>{c.authorName}</span>
+                            <span style={{ fontSize: "11px", color: "var(--c-text-3)" }}>{formatDate(c.created_at)}</span>
+                          </div>
+                          <p style={{ margin: "0 0 6px", fontSize: "13px", color: "var(--c-text)" }}>{c.comment}</p>
+                          <p style={{ margin: 0, fontSize: "11px", color: "var(--c-text-4)" }}>On: {c.itemText}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {pastDueItems.length === 0 && dueSoonItems.length === 0 && inProgressItems.length === 0 && qaqcAlerts.length === 0 && (
+                  <p style={{ color: "var(--c-text-3)", textAlign: "center", paddingTop: "20px" }}>No alerts — all clear! 🎉</p>
+                )}
+              </>
+            );
+          })() : viewMode === "category" ? (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
                 <h2 style={{ color: "var(--c-text)", margin: 0, fontSize: isMobile ? "16px" : "20px" }}>
