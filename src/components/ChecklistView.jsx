@@ -322,8 +322,8 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     setAddingComment(false);
   };
 
-  const loadQaqcAlerts = async () => {
-    if (qaqcAlertsLoaded) return;
+  const loadQaqcAlerts = async (force = false) => {
+    if (!force && qaqcAlertsLoaded) return;
     const itemIds = checklists.map((c) => c.id);
     if (!itemIds.length) { setQaqcAlertsLoaded(true); return; }
 
@@ -376,7 +376,7 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
       .from("checklist_comments")
       .update({ is_resolved: true, resolved_at: new Date().toISOString(), resolved_by: session.user.id })
       .eq("id", commentId);
-    if (!error) { setQaqcAlertsLoaded(false); await loadQaqcAlerts(); }
+    if (!error) { setQaqcAlertsLoaded(false); await loadQaqcAlerts(true); }
   };
 
   const submitDashReply = async (itemId) => {
