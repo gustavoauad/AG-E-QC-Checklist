@@ -1043,9 +1043,71 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                 </div>
               </div>
             );
+            // Build milestoneId → Set<itemId> from itemMsIdMap
+            const milestoneItemIds = {};
+            Object.entries(itemMsIdMap).forEach(([itemId, msIds]) => {
+              msIds.forEach((msId) => {
+                if (!milestoneItemIds[msId]) milestoneItemIds[msId] = new Set();
+                milestoneItemIds[msId].add(itemId);
+              });
+            });
+            const getMsProgress = (msId) => {
+              const ids = [...(milestoneItemIds[msId] || new Set())];
+              const msItems = ids.map((id) => checklists.find((c) => c.id === id)).filter(Boolean);
+              const done = msItems.filter((c) => c.status === "complete").length;
+              const applicable = msItems.filter((c) => c.status !== "na").length;
+              return { items: msItems, done, applicable, pct: applicable ? Math.round(done / applicable * 100) : 0 };
+            };
+            const upcomingMs = milestones
+              .map((m) => ({ ...m, dateObj: new Date(m.date + "T12:00:00") }))
+              .sort((a, b) => a.dateObj - b.dateObj);
+            const nextMs = upcomingMs.find((m) => m.dateObj >= today) || null;
+
+            // Status donut chart helpers
+            const CIRC = 2 * Math.PI * 54;
+            const inProgressCount = inProgressItems.length;
+            const donutSegments = [
+              { pct: totalItems ? completedItems / totalItems : 0, color: "#22c55e", label: "Complete" },
+              { pct: totalItems ? inProgressCount / totalItems : 0, color: "#a855f7", label: "In Progress" },
+              { pct: totalItems ? naItems / totalItems : 0, color: "#475569", label: "N/A" },
+              { pct: totalItems ? pendingItems / totalItems : 0, color: "#334155", label: "Pending" },
+            ];
+
             return (
               <>
                 <h2 style={{ color: "var(--c-text)", margin: "0 0 20px", fontSize: "18px" }}>Project Dashboard</h2>
+
+                {/* Current / Next Milestone Banner */}
+                {nextMs && (() => {
+                  const dLeft = Math.ceil((nextMs.dateObj - today) / 86400000);
+                  const { done, applicable, pct } = getMsProgress(nextMs.id);
+                  return (
+                    <div style={{ background: "var(--c-accent-dk)", border: "1px solid var(--c-accent)", borderRadius: "12px", padding: "16px 20px", marginBottom: "24px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: "10px", fontWeight: "700", color: "var(--c-accent-lt)", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 4px" }}>Next Milestone</p>
+                          <h3 style={{ margin: "0 0 2px", color: "var(--c-text)", fontSize: "18px", fontWeight: "800", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nextMs.name}</h3>
+                          <p style={{ margin: 0, fontSize: "12px", color: "var(--c-text-3)" }}>{formatDate(nextMs.date + "T12:00:00")}</p>
+                        </div>
+                        <div style={{ textAlign: "right", flexShrink: 0 }}>
+                          <span style={{ fontSize: "36px", fontWeight: "800", color: dLeft <= 7 ? "var(--c-warn)" : "var(--c-accent-lt)", lineHeight: 1 }}>{dLeft}</span>
+                          <p style={{ margin: "2px 0 0", fontSize: "11px", color: "var(--c-text-3)" }}>day{dLeft !== 1 ? "s" : ""} left</p>
+                        </div>
+                      </div>
+                      {applicable > 0 && (
+                        <div style={{ marginTop: "14px" }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+                            <span style={{ fontSize: "11px", color: "var(--c-text-3)" }}>{done}/{applicable} items complete</span>
+                            <span style={{ fontSize: "11px", fontWeight: "700", color: pct === 100 ? "#22c55e" : "var(--c-accent-lt)" }}>{pct}%</span>
+                          </div>
+                          <div style={{ height: "6px", background: "rgba(0,0,0,0.35)", borderRadius: "3px", overflow: "hidden" }}>
+                            <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "var(--c-accent-lt)", borderRadius: "3px", transition: "width 0.3s" }} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 {/* QA/QC flagged comments — top priority banner */}
                 {qaqcAlerts.length > 0 && (
@@ -1109,6 +1171,115 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                   {statCard("N/A", naItems, "var(--c-text-4)")}
                   {statCard("Progress", `${overallProgress}%`, overallProgress === 100 ? "var(--c-ok-text)" : "var(--c-accent)")}
                 </div>
+                {/* Charts row */}
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "auto 1fr", gap: "16px", marginBottom: "28px", alignItems: "start" }}>
+                  {/* Status donut chart */}
+                  <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "12px", padding: "16px 20px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 14px" }}>Status Breakdown</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+                      <svg viewBox="0 0 160 160" width="130" height="130" style={{ flexShrink: 0 }}>
+                        <circle cx="80" cy="80" r="54" fill="none" stroke="var(--c-border)" strokeWidth="22" />
+                        {totalItems > 0 && (() => {
+                          let offset = 0;
+                          return donutSegments.filter((s) => s.pct > 0).map((s) => {
+                            const dash = s.pct * CIRC;
+                            const el = (
+                              <circle key={s.label} cx="80" cy="80" r="54" fill="none"
+                                stroke={s.color} strokeWidth="22"
+                                strokeDasharray={`${dash} ${CIRC}`}
+                                strokeDashoffset={-(offset * CIRC)}
+                                transform="rotate(-90 80 80)"
+                                style={{ transition: "stroke-dasharray 0.4s" }}
+                              />
+                            );
+                            offset += s.pct;
+                            return el;
+                          });
+                        })()}
+                        <text x="80" y="76" textAnchor="middle" fontSize="22" fontWeight="800" fill="var(--c-text)">{overallProgress}%</text>
+                        <text x="80" y="94" textAnchor="middle" fontSize="10" fill="var(--c-text-4)">complete</text>
+                      </svg>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        {[
+                          { label: "Complete",    count: completedItems,    color: "#22c55e" },
+                          { label: "In Progress", count: inProgressCount,   color: "#a855f7" },
+                          { label: "Pending",     count: pendingItems,      color: "var(--c-text-4)" },
+                          { label: "N/A",         count: naItems,           color: "#475569" },
+                        ].map(({ label, count, color }) => (
+                          <div key={label} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ width: "10px", height: "10px", borderRadius: "2px", background: color, flexShrink: 0 }} />
+                            <span style={{ fontSize: "12px", color: "var(--c-text-3)", minWidth: "70px" }}>{label}</span>
+                            <span style={{ fontSize: "12px", fontWeight: "700", color: "var(--c-text)" }}>{count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Per-category progress bars */}
+                  <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "12px", padding: "16px 20px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 14px" }}>Progress by Checklist</p>
+                    <div style={{ display: "grid", gap: "10px" }}>
+                      {enabledCategories.map((cat) => {
+                        const { done, applicable, pct } = getCategoryStats(cat.id);
+                        if (applicable === 0) return null;
+                        return (
+                          <div key={cat.id}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+                              <span style={{ fontSize: "12px", color: "var(--c-text-2)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, marginRight: "8px" }}>{getCatLabel(cat.id)}</span>
+                              <span style={{ fontSize: "11px", color: pct === 100 ? "#22c55e" : "var(--c-text-4)", fontWeight: "600", flexShrink: 0 }}>{done}/{applicable} · {pct}%</span>
+                            </div>
+                            <div style={{ height: "5px", background: "var(--c-border)", borderRadius: "3px", overflow: "hidden" }}>
+                              <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "var(--c-accent)", borderRadius: "3px", transition: "width 0.4s" }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Milestone timeline */}
+                {milestones.length > 0 && (
+                  <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "12px", padding: "16px 20px", marginBottom: "28px" }}>
+                    <p style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-text-3)", textTransform: "uppercase", letterSpacing: "0.06em", margin: "0 0 16px" }}>Milestone Timeline</p>
+                    {upcomingMs.map((m, idx) => {
+                      const dLeft = Math.ceil((m.dateObj - today) / 86400000);
+                      const isPast = dLeft < 0;
+                      const isNext = !isPast && nextMs?.id === m.id;
+                      const { done, applicable, pct } = getMsProgress(m.id);
+                      const dotColor = isPast ? "#22c55e" : isNext ? "var(--c-accent)" : "var(--c-border)";
+                      return (
+                        <div key={m.id} style={{ display: "flex", gap: "14px" }}>
+                          {/* Timeline spine */}
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", width: "14px", flexShrink: 0 }}>
+                            <div style={{ width: "12px", height: "12px", borderRadius: "50%", background: dotColor, border: `2px solid ${isNext ? "var(--c-accent)" : dotColor}`, boxShadow: isNext ? "0 0 0 3px var(--c-accent-dk)" : "none", marginTop: "3px", flexShrink: 0 }} />
+                            {idx < upcomingMs.length - 1 && <div style={{ width: "2px", flex: 1, background: "var(--c-border)", margin: "4px 0" }} />}
+                          </div>
+                          {/* Milestone card */}
+                          <div style={{ flex: 1, paddingBottom: idx < upcomingMs.length - 1 ? "16px" : "0" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "2px", gap: "8px" }}>
+                              <span style={{ fontSize: "13px", fontWeight: isNext ? "700" : "600", color: isNext ? "var(--c-accent-lt)" : isPast ? "var(--c-text-4)" : "var(--c-text)" }}>{m.name}</span>
+                              <span style={{ fontSize: "11px", fontWeight: "600", color: isPast ? "#22c55e" : dLeft <= 7 ? "var(--c-warn)" : "var(--c-text-4)", flexShrink: 0 }}>
+                                {isPast ? `✓ ${Math.abs(dLeft)}d ago` : dLeft === 0 ? "Today" : `${dLeft}d`}
+                              </span>
+                            </div>
+                            <span style={{ fontSize: "10px", color: "var(--c-text-4)" }}>{formatDate(m.date + "T12:00:00")}</span>
+                            {applicable > 0 && (
+                              <div style={{ marginTop: "6px" }}>
+                                <div style={{ height: "4px", background: "var(--c-border)", borderRadius: "2px", overflow: "hidden", marginBottom: "3px" }}>
+                                  <div style={{ height: "100%", width: `${pct}%`, background: pct === 100 ? "#22c55e" : "var(--c-accent)", borderRadius: "2px", transition: "width 0.4s" }} />
+                                </div>
+                                <span style={{ fontSize: "10px", color: "var(--c-text-4)" }}>{done}/{applicable} items · {pct}%</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Past due */}
                 <DueList items={pastDueItems} title={`⚠ Past Due (${pastDueItems.length})`} color="var(--c-err)" />
                 {/* Due soon */}
