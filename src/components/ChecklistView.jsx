@@ -5,7 +5,7 @@ import { useIsMobile } from "../useIsMobile";
 import AgeLogo from "./AgeLogo";
 import NotificationBell from "./NotificationBell";
 
-export default function ChecklistView({ project, userRole, session, onBack, onSignOut, onGoToProjects }) {
+export default function ChecklistView({ project, userRole, session, onBack, onSignOut, onGoToProjects, onOpenSetup }) {
   const isMobile = useIsMobile();
   const [checklists, setChecklists] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -211,25 +211,36 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
     }
   };
 
-  const getCategoryProgress = (categoryId) => {
+  const getCategoryStats = (categoryId) => {
     const items = checklists.filter((c) => c.category === categoryId);
-    if (!items.length) return 0;
-    return Math.round((items.filter((c) => c.status === "complete" || c.status === "na").length / items.length) * 100);
+    const done = items.filter((c) => c.status === "complete").length;
+    const na = items.filter((c) => c.status === "na").length;
+    const applicable = items.length - na;
+    const pct = applicable ? Math.round((done / applicable) * 100) : 0;
+    return { done, na, applicable, total: items.length, pct };
   };
 
-  const getMilestoneProgress = (milestoneId) => {
+  // keep alias for legacy callers
+  const getCategoryProgress = (categoryId) => getCategoryStats(categoryId).pct;
+
+  const getMilestoneStats = (milestoneId) => {
     const ids = milestoneItemsCache[milestoneId];
-    if (!ids || ids.size === 0) return 0;
+    if (!ids || ids.size === 0) return { done: 0, applicable: 0, pct: 0 };
     const items = checklists.filter((c) => ids.has(c.id));
-    if (!items.length) return 0;
-    return Math.round((items.filter((c) => c.status === "complete" || c.status === "na").length / items.length) * 100);
+    const done = items.filter((c) => c.status === "complete").length;
+    const na = items.filter((c) => c.status === "na").length;
+    const applicable = items.length - na;
+    return { done, applicable, pct: applicable ? Math.round((done / applicable) * 100) : 0 };
   };
+
+  const getMilestoneProgress = (milestoneId) => getMilestoneStats(milestoneId).pct;
 
   const totalItems = checklists.length;
   const completedItems = checklists.filter((c) => c.status === "complete").length;
   const naItems = checklists.filter((c) => c.status === "na").length;
   const pendingItems = checklists.filter((c) => c.status === "pending").length;
-  const overallProgress = totalItems ? Math.round(((completedItems + naItems) / totalItems) * 100) : 0;
+  const applicableItems = totalItems - naItems;
+  const overallProgress = applicableItems ? Math.round((completedItems / applicableItems) * 100) : 0;
 
   const statusColors = {
     complete: { bg: "var(--c-ok-bg)", border: "var(--c-ok)", color: "var(--c-ok-text)", label: isMobile ? "✓" : "Complete" },
@@ -501,15 +512,24 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                 </h1>
               </div>
               <p style={{ margin: 0, fontSize: "11px", color: "var(--c-text-2)" }}>
-                {completedItems} done · {naItems} N/A · {pendingItems} pending · {overallProgress}%
+                <span style={{ color: overallProgress === 100 ? "var(--c-ok-text)" : "var(--c-text-2)" }}>
+                  {completedItems} / {applicableItems} done ({overallProgress}%)
+                </span>
+                {" · "}{pendingItems} pending{naItems > 0 ? ` · ${naItems} N/A` : ""}
               </p>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
             {!isMobile && (
-              <span style={{ fontSize: "12px", color: "var(--c-text-2)" }}>
-                Role: <strong style={{ color: "var(--c-text)" }}>{userRole.replace("_", " ")}</strong>
+              <span style={{ fontSize: "11px", color: "var(--c-text-3)", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: "20px", padding: "2px 8px" }}>
+                {userRole === "project_manager" ? "PM" : userRole.replace("_", " ")}
               </span>
+            )}
+            {userRole === "project_manager" && onOpenSetup && (
+              <button onClick={onOpenSetup} title="Project Setup" style={{
+                padding: "6px 10px", background: "transparent", border: "1px solid var(--c-border)",
+                color: "var(--c-text-2)", borderRadius: "6px", cursor: "pointer", fontSize: "14px", lineHeight: 1,
+              }}>⚙</button>
             )}
             <NotificationBell userId={session.user.id} onGoToProjects={onGoToProjects} />
             <button onClick={onSignOut} style={{ padding: "6px 12px", background: "var(--c-err)", color: "white", border: "none", borderRadius: "6px", cursor: "pointer", fontSize: "13px" }}>
@@ -610,8 +630,9 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
           <div style={{ width: "220px", background: "var(--c-surface)", borderRight: "1px solid #334155", overflowY: "auto", padding: "12px" }}>
             {viewMode === "category" ? (
               enabledCategories.map((cat) => {
-                const progress = getCategoryProgress(cat.id);
+                const { done, applicable, pct } = getCategoryStats(cat.id);
                 const isActive = activeCategory === cat.id;
+                const isDone = applicable > 0 && done === applicable;
                 return (
                   <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{
                     width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -620,9 +641,10 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                     color: isActive ? "white" : canEdit(cat.id) ? "var(--c-text)" : "var(--c-text-3)",
                     cursor: "pointer", fontSize: "13px", textAlign: "left",
                   }}>
-                    <span style={{ flex: 1 }}>{cat.label}</span>
-                    <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "var(--c-ok-text)" : "var(--c-text-2)" }}>
-                      {progress}%
+                    <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cat.label}</span>
+                    <span style={{ fontSize: "10px", fontWeight: "600", flexShrink: 0, marginLeft: "6px",
+                      color: isActive ? "rgba(255,255,255,0.85)" : isDone ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
+                      {done}/{applicable}
                     </span>
                   </button>
                 );
@@ -644,9 +666,14 @@ export default function ChecklistView({ project, userRole, session, onBack, onSi
                     }}>
                       <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "3px" }}>
                         <span style={{ fontSize: "13px", fontWeight: "600" }}>{m.name}</span>
-                        <span style={{ fontSize: "11px", fontWeight: "600", color: isActive ? "white" : progress === 100 ? "var(--c-ok-text)" : "var(--c-text-2)" }}>
-                          {milestoneItemsCache[m.id] ? `${progress}%` : ""}
-                        </span>
+                        {milestoneItemsCache[m.id] ? (() => {
+                          const ms = getMilestoneStats(m.id);
+                          return (
+                            <span style={{ fontSize: "10px", fontWeight: "600", color: isActive ? "rgba(255,255,255,0.85)" : ms.done === ms.applicable && ms.applicable > 0 ? "var(--c-ok-text)" : "var(--c-text-3)" }}>
+                              {ms.done}/{ms.applicable}
+                            </span>
+                          );
+                        })() : null}
                       </div>
                       <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                         <span style={{ fontSize: "11px", color: isActive ? "rgba(255,255,255,0.7)" : "var(--c-text-3)" }}>

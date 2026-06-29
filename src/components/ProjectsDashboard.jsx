@@ -5,9 +5,9 @@ import CreateProjectModal from "./CreateProjectModal";
 import ProjectSetupModal from "./ProjectSetupModal";
 
 const roleColors = {
-  project_manager: { bg: "var(--c-accent-dk)", color: "var(--c-accent-lt)", label: "Project Manager" },
-  engineer:        { bg: "#1a3a2a", color: "#4ade80", label: "Engineer" },
-  drafter:         { bg: "#3a1a3a", color: "#c084fc", label: "Drafter" },
+  project_manager: { color: "var(--c-accent-lt)", label: "PM" },
+  engineer:        { color: "var(--c-ok-text)", label: "Engineer" },
+  drafter:         { color: "var(--c-purple)", label: "Drafter" },
 };
 
 export default function ProjectsDashboard({ session, org, orgRole, onSelectProject }) {
@@ -158,13 +158,13 @@ export default function ProjectsDashboard({ session, org, orgRole, onSelectProje
                 <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", alignItems: isMobile ? "flex-end" : "center", gap: "8px", flexShrink: 0 }}>
                   {role ? (
                     <span style={{
-                      padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600",
-                      background: roleColors[role]?.bg, color: roleColors[role]?.color, whiteSpace: "nowrap",
+                      fontSize: "10px", fontWeight: "700", color: roleColors[role]?.color,
+                      letterSpacing: "0.04em", whiteSpace: "nowrap",
                     }}>
-                      {isMobile ? (role === "project_manager" ? "PM" : role.charAt(0).toUpperCase() + role.slice(1)) : roleColors[role]?.label}
+                      {roleColors[role]?.label || role}
                     </span>
                   ) : (
-                    <span style={{ padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "600", background: "var(--c-surface)", color: "var(--c-text-3)", border: "1px solid #334155" }}>
+                    <span style={{ fontSize: "10px", fontWeight: "600", color: "var(--c-text-4)" }}>
                       Not assigned
                     </span>
                   )}

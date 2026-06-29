@@ -7,6 +7,7 @@ import OrgDashboard from "./OrgDashboard";
 import ProjectsDashboard from "./ProjectsDashboard";
 import OrgSettings from "./OrgSettings";
 import ChecklistView from "./ChecklistView";
+import ProjectSetupModal from "./ProjectSetupModal";
 
 export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut, onSwitchOrg }) {
   const isMobile = useIsMobile();
@@ -16,6 +17,7 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
   const [userRole, setUserRole] = useState(null);
   const [org, setOrg] = useState(initialOrg);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [setupFromChecklist, setSetupFromChecklist] = useState(false);
 
   const nav = [
     { id: "dashboard", icon: "📊", label: "Dashboard" },
@@ -25,14 +27,30 @@ export default function OrgShell({ session, org: initialOrg, orgRole, onSignOut,
 
   if (selectedProject) {
     return (
-      <ChecklistView
-        project={selectedProject}
-        userRole={userRole}
-        session={session}
-        onBack={() => { setSelectedProject(null); setUserRole(null); }}
-        onSignOut={onSignOut}
-        onGoToProjects={() => { setSelectedProject(null); setUserRole(null); setSection("projects"); }}
-      />
+      <>
+        <ChecklistView
+          project={selectedProject}
+          userRole={userRole}
+          session={session}
+          onBack={() => { setSelectedProject(null); setUserRole(null); }}
+          onSignOut={onSignOut}
+          onGoToProjects={() => { setSelectedProject(null); setUserRole(null); setSection("projects"); }}
+          onOpenSetup={userRole === "project_manager" ? () => setSetupFromChecklist(true) : null}
+        />
+        {setupFromChecklist && (
+          <ProjectSetupModal
+            project={selectedProject}
+            session={session}
+            org={org}
+            orgRole={orgRole}
+            userRole={userRole}
+            onClose={() => setSetupFromChecklist(false)}
+            onProjectRenamed={(newName, newDesc) =>
+              setSelectedProject((p) => ({ ...p, name: newName, description: newDesc }))
+            }
+          />
+        )}
+      </>
     );
   }
 
