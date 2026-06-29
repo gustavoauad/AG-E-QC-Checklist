@@ -62,8 +62,12 @@ function ChecklistsTab({ project, userRole }) {
   const [milestones, setMilestones] = useState([]);
   // itemMilestones: itemId → Set<milestoneId>
   const [itemMilestones, setItemMilestones] = useState({});
-  // daysPopover: { type:'cat'|'section'|'item', catId, sectionLabel?, itemId?, inputVal }
+  // daysPopover: { type:'cat'|'section', catId, sectionLabel?, msInputs:{ [msId]: string } }
   const [daysPopover, setDaysPopover] = useState(null);
+  // editingDays: { itemId, milestoneId, val } — inline days input on a specific pill
+  const [editingDays, setEditingDays] = useState(null);
+  // itemMilestoneDays: { [itemId]: { [milestoneId]: number } }
+  const [itemMilestoneDays, setItemMilestoneDays] = useState({});
 
   useEffect(() => { loadAll(); }, []);
 
@@ -93,14 +97,20 @@ function ChecklistsTab({ project, userRole }) {
     if (ms.length > 0) {
       const msIds = ms.map((m) => m.id);
       const { data: miData } = await supabase.from("milestone_items")
-        .select("milestone_id, checklist_item_id")
+        .select("milestone_id, checklist_item_id, days_before")
         .in("milestone_id", msIds);
       const imMap = {};
-      (miData || []).forEach(({ milestone_id, checklist_item_id }) => {
+      const imdMap = {};
+      (miData || []).forEach(({ milestone_id, checklist_item_id, days_before }) => {
         if (!imMap[checklist_item_id]) imMap[checklist_item_id] = new Set();
         imMap[checklist_item_id].add(milestone_id);
+        if (days_before != null) {
+          if (!imdMap[checklist_item_id]) imdMap[checklist_item_id] = {};
+          imdMap[checklist_item_id][milestone_id] = days_before;
+        }
       });
       setItemMilestones(imMap);
+      setItemMilestoneDays(imdMap);
     }
     setLoading(false);
   };
@@ -185,33 +195,50 @@ function ChecklistsTab({ project, userRole }) {
     setEditingItemId(null);
   };
 
-  const saveDays = async (p) => {
-    const days = p.inputVal === "" ? null : parseInt(p.inputVal, 10);
-    if (days !== null && (isNaN(days) || days < 0)) { setDaysPopover(null); return; }
-    let q = supabase.from("checklists").update({ days_before_milestone: days }).eq("project_id", project.id);
-    if (p.type === "cat") q = q.eq("category", p.catId);
-    else if (p.type === "section") q = q.eq("category", p.catId).eq("sub_section", p.sectionLabel);
-    else q = q.eq("id", p.itemId);
-    await q;
-    setItems((prev) => {
+  const saveMilestoneDays = async (itemIds, milestoneId, daysStr) => {
+    const days = daysStr === "" ? null : parseInt(daysStr, 10);
+    if (days !== null && (isNaN(days) || days < 0)) return;
+    // Only update rows that actually exist in milestone_items
+    const targets = itemIds.filter((id) => itemMilestones[id]?.has(milestoneId));
+    if (!targets.length) return;
+    await Promise.all(targets.map((id) =>
+      supabase.from("milestone_items")
+        .update({ days_before: days })
+        .eq("checklist_item_id", id)
+        .eq("milestone_id", milestoneId)
+    ));
+    setItemMilestoneDays((prev) => {
       const next = { ...prev };
-      if (p.type === "item") {
-        next[p.catId] = prev[p.catId].map((i) => i.id === p.itemId ? { ...i, days_before_milestone: days } : i);
-      } else if (p.type === "section") {
-        next[p.catId] = prev[p.catId].map((i) => i.sub_section === p.sectionLabel ? { ...i, days_before_milestone: days } : i);
-      } else {
-        next[p.catId] = prev[p.catId].map((i) => ({ ...i, days_before_milestone: days }));
-      }
+      targets.forEach((id) => {
+        next[id] = { ...(next[id] || {}) };
+        if (days == null) delete next[id][milestoneId];
+        else next[id][milestoneId] = days;
+      });
       return next;
     });
-    setDaysPopover(null);
   };
 
-  const getDaysChipLabel = (itemList) => {
-    const vals = itemList.map((i) => i.days_before_milestone).filter((v) => v != null);
-    if (vals.length === 0) return null;
-    const mn = Math.min(...vals), mx = Math.max(...vals);
-    return mn === mx ? `${mn}d` : `${mn}–${mx}d`;
+  const openDaysPopover = (type, catId, sectionLabel) => {
+    const scopeItems = (items[catId] || []).filter((i) => type === "section" ? i.sub_section === sectionLabel : true);
+    const msInputs = {};
+    milestones.forEach((m) => {
+      const assignedItems = scopeItems.filter((i) => itemMilestones[i.id]?.has(m.id));
+      if (assignedItems.length === 0) { msInputs[m.id] = ""; return; }
+      const vals = assignedItems.map((i) => itemMilestoneDays[i.id]?.[m.id]).filter((v) => v != null);
+      const uniq = [...new Set(vals)];
+      msInputs[m.id] = uniq.length === 1 ? String(uniq[0]) : "";
+    });
+    setDaysPopover({ type, catId, sectionLabel, msInputs });
+  };
+
+  const applyDaysPopover = async () => {
+    if (!daysPopover) return;
+    const { type, catId, sectionLabel, msInputs } = daysPopover;
+    const scopeItems = (items[catId] || []).filter((i) => type === "section" ? i.sub_section === sectionLabel : true);
+    await Promise.all(
+      Object.entries(msInputs).map(([msId, val]) => saveMilestoneDays(scopeItems.map((i) => i.id), msId, val))
+    );
+    setDaysPopover(null);
   };
 
   const removeItem = async (item) => {
@@ -460,25 +487,39 @@ function ChecklistsTab({ project, userRole }) {
                     )}
                     <button onClick={() => { setRenamingCat(cat.id); setRenameCatText(getLabel(cat)); }} style={mBtn()}>Rename</button>
                     {cat.isCustom && <button onClick={() => deleteCustomCat(cat.id)} style={mBtn({ color: "var(--c-err)" })}>x</button>}
-                    {(() => {
+                    {milestones.length > 0 && (() => {
                       const isOpen = daysPopover?.type === "cat" && daysPopover?.catId === cat.id;
-                      const chipLabel = getDaysChipLabel(catItems);
+                      const hasAny = catItems.some((i) => Object.keys(itemMilestoneDays[i.id] || {}).length > 0);
                       if (isOpen) return (
-                        <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--c-surface)", border: "1px solid var(--c-accent)", borderRadius: "6px", padding: "2px 6px" }} onClick={(e) => e.stopPropagation()}>
-                          <input autoFocus type="number" min="0" placeholder="days" value={daysPopover.inputVal}
-                            onChange={(e) => setDaysPopover((p) => ({ ...p, inputVal: e.target.value }))}
-                            onKeyDown={(e) => { if (e.key === "Enter") saveDays(daysPopover); if (e.key === "Escape") setDaysPopover(null); }}
-                            style={{ width: "54px", padding: "2px 5px", background: "var(--c-bg)", border: "none", borderRadius: "4px", color: "var(--c-text)", fontSize: "11px", outline: "none" }}
-                          />
-                          <span style={{ fontSize: "10px", color: "var(--c-text-3)", whiteSpace: "nowrap" }}>d before ms</span>
-                          <button onClick={() => saveDays(daysPopover)} style={{ padding: "1px 6px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "10px", fontWeight: "600" }}>All</button>
-                          <button onClick={() => setDaysPopover(null)} style={{ padding: "1px 5px", background: "transparent", border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "11px" }}>×</button>
+                        <div style={{ position: "relative" }}>
+                          <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "4px", zIndex: 20, background: "var(--c-bg)", border: "1px solid var(--c-accent)", borderRadius: "10px", padding: "12px 14px", minWidth: "220px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
+                            <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-text-2)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Days before milestone — all items</div>
+                            {milestones.map((m) => (
+                              <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
+                                <span style={{ flex: 1, fontSize: "12px", color: "var(--c-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                                <input type="number" min="0" placeholder="—" value={daysPopover.msInputs[m.id] ?? ""}
+                                  onChange={(e) => setDaysPopover((p) => ({ ...p, msInputs: { ...p.msInputs, [m.id]: e.target.value } }))}
+                                  onKeyDown={(e) => { if (e.key === "Enter") applyDaysPopover(); if (e.key === "Escape") setDaysPopover(null); }}
+                                  style={{ width: "52px", padding: "4px 6px", background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "5px", color: "var(--c-text)", fontSize: "12px", textAlign: "center" }}
+                                />
+                                <span style={{ fontSize: "11px", color: "var(--c-text-4)" }}>d</span>
+                              </div>
+                            ))}
+                            <div style={{ display: "flex", gap: "6px", marginTop: "10px", justifyContent: "flex-end" }}>
+                              <button onClick={() => setDaysPopover(null)} style={{ padding: "4px 10px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-3)", borderRadius: "5px", cursor: "pointer", fontSize: "11px" }}>Cancel</button>
+                              <button onClick={applyDaysPopover} style={{ padding: "4px 12px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>Apply to all</button>
+                            </div>
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); openDaysPopover("cat", cat.id); }}
+                            style={{ padding: "2px 7px", border: `1px solid var(--c-accent)`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", whiteSpace: "nowrap" }}>
+                            📅 days
+                          </button>
                         </div>
                       );
                       return (
-                        <button onClick={(e) => { e.stopPropagation(); const vals = catItems.map((i) => i.days_before_milestone).filter((v) => v != null); const uniq = [...new Set(vals)]; setDaysPopover({ type: "cat", catId: cat.id, inputVal: uniq.length === 1 ? String(uniq[0]) : "" }); }}
-                          style={{ padding: "2px 7px", border: `1px solid ${chipLabel ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: chipLabel ? "var(--c-accent-dk)" : "transparent", color: chipLabel ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
-                          📅 {chipLabel || "+"}
+                        <button onClick={(e) => { e.stopPropagation(); openDaysPopover("cat", cat.id); }}
+                          style={{ padding: "2px 7px", border: `1px solid ${hasAny ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: hasAny ? "var(--c-accent-dk)" : "transparent", color: hasAny ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                          📅 days
                         </button>
                       );
                     })()}
@@ -538,26 +579,40 @@ function ChecklistsTab({ project, userRole }) {
                               })()}
                               {canEdit && (
                                 <div style={{ display: "flex", gap: "3px", flexShrink: 0, alignItems: "center" }}>
-                                  {(() => {
+                                  {milestones.length > 0 && (() => {
                                     const secItems = catItems.filter((i) => i.sub_section === sLabel);
                                     const isOpen = daysPopover?.type === "section" && daysPopover?.catId === cat.id && daysPopover?.sectionLabel === sLabel;
-                                    const chipLabel = getDaysChipLabel(secItems);
+                                    const hasAny = secItems.some((i) => Object.keys(itemMilestoneDays[i.id] || {}).length > 0);
                                     if (isOpen) return (
-                                      <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--c-surface)", border: "1px solid var(--c-accent)", borderRadius: "6px", padding: "2px 6px" }} onClick={(e) => e.stopPropagation()}>
-                                        <input autoFocus type="number" min="0" placeholder="days" value={daysPopover.inputVal}
-                                          onChange={(e) => setDaysPopover((p) => ({ ...p, inputVal: e.target.value }))}
-                                          onKeyDown={(e) => { if (e.key === "Enter") saveDays(daysPopover); if (e.key === "Escape") setDaysPopover(null); }}
-                                          style={{ width: "48px", padding: "2px 5px", background: "var(--c-bg)", border: "none", borderRadius: "4px", color: "var(--c-text)", fontSize: "11px", outline: "none" }}
-                                        />
-                                        <span style={{ fontSize: "10px", color: "var(--c-text-3)", whiteSpace: "nowrap" }}>d before ms</span>
-                                        <button onClick={() => saveDays(daysPopover)} style={{ padding: "1px 6px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "10px", fontWeight: "600" }}>Set</button>
-                                        <button onClick={() => setDaysPopover(null)} style={{ padding: "1px 5px", background: "transparent", border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "11px" }}>×</button>
+                                      <div style={{ position: "relative" }}>
+                                        <div style={{ position: "absolute", right: 0, top: "100%", marginTop: "4px", zIndex: 20, background: "var(--c-bg)", border: "1px solid var(--c-accent)", borderRadius: "10px", padding: "12px 14px", minWidth: "220px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }} onClick={(e) => e.stopPropagation()}>
+                                          <div style={{ fontSize: "11px", fontWeight: "700", color: "var(--c-text-2)", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Days before milestone — "{sLabel}"</div>
+                                          {milestones.map((m) => (
+                                            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "7px" }}>
+                                              <span style={{ flex: 1, fontSize: "12px", color: "var(--c-text-3)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.name}</span>
+                                              <input type="number" min="0" placeholder="—" value={daysPopover.msInputs[m.id] ?? ""}
+                                                onChange={(e) => setDaysPopover((p) => ({ ...p, msInputs: { ...p.msInputs, [m.id]: e.target.value } }))}
+                                                onKeyDown={(e) => { if (e.key === "Enter") applyDaysPopover(); if (e.key === "Escape") setDaysPopover(null); }}
+                                                style={{ width: "52px", padding: "4px 6px", background: "var(--c-surface)", border: "1px solid #334155", borderRadius: "5px", color: "var(--c-text)", fontSize: "12px", textAlign: "center" }}
+                                              />
+                                              <span style={{ fontSize: "11px", color: "var(--c-text-4)" }}>d</span>
+                                            </div>
+                                          ))}
+                                          <div style={{ display: "flex", gap: "6px", marginTop: "10px", justifyContent: "flex-end" }}>
+                                            <button onClick={() => setDaysPopover(null)} style={{ padding: "4px 10px", background: "transparent", border: "1px solid #334155", color: "var(--c-text-3)", borderRadius: "5px", cursor: "pointer", fontSize: "11px" }}>Cancel</button>
+                                            <button onClick={applyDaysPopover} style={{ padding: "4px 12px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "5px", cursor: "pointer", fontSize: "11px", fontWeight: "600" }}>Apply to section</button>
+                                          </div>
+                                        </div>
+                                        <button onClick={(e) => { e.stopPropagation(); openDaysPopover("section", cat.id, sLabel); }}
+                                          style={{ padding: "2px 7px", border: "1px solid var(--c-accent)", borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: "var(--c-accent-dk)", color: "var(--c-accent-lt)", whiteSpace: "nowrap" }}>
+                                          📅 days
+                                        </button>
                                       </div>
                                     );
                                     return (
-                                      <button onClick={(e) => { e.stopPropagation(); const vals = secItems.map((i) => i.days_before_milestone).filter((v) => v != null); const uniq = [...new Set(vals)]; setDaysPopover({ type: "section", catId: cat.id, sectionLabel: sLabel, inputVal: uniq.length === 1 ? String(uniq[0]) : "" }); }}
-                                        style={{ padding: "2px 7px", border: `1px solid ${chipLabel ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: chipLabel ? "var(--c-accent-dk)" : "transparent", color: chipLabel ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
-                                        📅 {chipLabel || "+"}
+                                      <button onClick={(e) => { e.stopPropagation(); openDaysPopover("section", cat.id, sLabel); }}
+                                        style={{ padding: "2px 7px", border: `1px solid ${hasAny ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "10px", fontWeight: "600", cursor: "pointer", background: hasAny ? "var(--c-accent-dk)" : "transparent", color: hasAny ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                                        📅 days
                                       </button>
                                     );
                                   })()}
@@ -598,38 +653,36 @@ function ChecklistsTab({ project, userRole }) {
                                   <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "3px", flexWrap: "wrap" }}>
                                     {milestones.map((m) => {
                                       const isActive = itemMilestones[item.id]?.has(m.id) ?? false;
+                                      const days = itemMilestoneDays[item.id]?.[m.id];
+                                      const isEditingD = editingDays?.itemId === item.id && editingDays?.milestoneId === m.id;
                                       return (
-                                        <button key={m.id} onClick={(e) => { e.stopPropagation(); if (canEdit) toggleItemMilestone(item.id, m.id, !isActive); }}
-                                          disabled={!canEdit}
-                                          style={{ padding: "1px 6px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
-                                          {m.name}
-                                        </button>
+                                        <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "1px" }}>
+                                          <button onClick={(e) => { e.stopPropagation(); if (canEdit) toggleItemMilestone(item.id, m.id, !isActive); }}
+                                            disabled={!canEdit}
+                                            style={{ padding: "1px 6px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: isActive ? "20px 0 0 20px" : "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                                            {m.name}
+                                          </button>
+                                          {isActive && canEdit && (isEditingD ? (
+                                            <div style={{ display: "flex", alignItems: "center", background: "var(--c-accent-dk)", border: "1px solid var(--c-accent)", borderLeft: "none", borderRadius: "0 20px 20px 0", overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
+                                              <input autoFocus type="number" min="0" value={editingDays.val}
+                                                onChange={(e) => setEditingDays((p) => ({ ...p, val: e.target.value }))}
+                                                onKeyDown={async (e) => { if (e.key === "Enter") { await saveMilestoneDays([item.id], m.id, editingDays.val); setEditingDays(null); } if (e.key === "Escape") setEditingDays(null); }}
+                                                onBlur={async () => { await saveMilestoneDays([item.id], m.id, editingDays.val); setEditingDays(null); }}
+                                                style={{ width: "36px", padding: "1px 4px", background: "transparent", border: "none", color: "var(--c-accent-lt)", fontSize: "9px", outline: "none", textAlign: "center" }}
+                                              />
+                                              <span style={{ fontSize: "9px", color: "var(--c-accent-lt)", paddingRight: "5px" }}>d</span>
+                                            </div>
+                                          ) : (
+                                            <button onClick={(e) => { e.stopPropagation(); setEditingDays({ itemId: item.id, milestoneId: m.id, val: days != null ? String(days) : "" }); }}
+                                              style={{ padding: "1px 6px", border: "1px solid var(--c-accent)", borderLeft: "none", borderRadius: "0 20px 20px 0", fontSize: "9px", fontWeight: "600", cursor: "pointer", background: "var(--c-accent-dk)", color: days != null ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                                              {days != null ? `${days}d` : "+d"}
+                                            </button>
+                                          ))}
+                                        </div>
                                       );
                                     })}
                                   </div>
                                 )}
-                                {canEdit && (() => {
-                                  const isOpen = daysPopover?.type === "item" && daysPopover?.itemId === item.id;
-                                  const d = item.days_before_milestone;
-                                  if (isOpen) return (
-                                    <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--c-surface)", border: "1px solid var(--c-accent)", borderRadius: "6px", padding: "2px 6px", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                                      <input autoFocus type="number" min="0" placeholder="days" value={daysPopover.inputVal}
-                                        onChange={(e) => setDaysPopover((p) => ({ ...p, inputVal: e.target.value }))}
-                                        onKeyDown={(e) => { if (e.key === "Enter") saveDays(daysPopover); if (e.key === "Escape") setDaysPopover(null); }}
-                                        style={{ width: "44px", padding: "2px 4px", background: "var(--c-bg)", border: "none", borderRadius: "4px", color: "var(--c-text)", fontSize: "11px", outline: "none" }}
-                                      />
-                                      <span style={{ fontSize: "10px", color: "var(--c-text-3)" }}>d</span>
-                                      <button onClick={() => saveDays(daysPopover)} style={{ padding: "1px 5px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "10px", fontWeight: "600" }}>✓</button>
-                                      <button onClick={() => setDaysPopover(null)} style={{ padding: "1px 4px", background: "transparent", border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "11px" }}>×</button>
-                                    </div>
-                                  );
-                                  return (
-                                    <button onClick={(e) => { e.stopPropagation(); setDaysPopover({ type: "item", catId: item.category, itemId: item.id, inputVal: d != null ? String(d) : "" }); }}
-                                      style={{ padding: "1px 6px", border: `1px solid ${d != null ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: "pointer", background: d != null ? "var(--c-accent-dk)" : "transparent", color: d != null ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                                      📅 {d != null ? `${d}d` : "+"}
-                                    </button>
-                                  );
-                                })()}
                                 {canEdit && (
                                   <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                     {editingItemId === item.id
@@ -705,38 +758,36 @@ function ChecklistsTab({ project, userRole }) {
                                       <div style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: "3px", flexWrap: "wrap" }}>
                                         {milestones.map((m) => {
                                           const isActive = itemMilestones[item.id]?.has(m.id) ?? false;
+                                          const days = itemMilestoneDays[item.id]?.[m.id];
+                                          const isEditingD = editingDays?.itemId === item.id && editingDays?.milestoneId === m.id;
                                           return (
-                                            <button key={m.id} onClick={(e) => { e.stopPropagation(); if (canEdit) toggleItemMilestone(item.id, m.id, !isActive); }}
-                                              disabled={!canEdit}
-                                              style={{ padding: "1px 6px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
-                                              {m.name}
-                                            </button>
+                                            <div key={m.id} style={{ display: "flex", alignItems: "center", gap: "1px" }}>
+                                              <button onClick={(e) => { e.stopPropagation(); if (canEdit) toggleItemMilestone(item.id, m.id, !isActive); }}
+                                                disabled={!canEdit}
+                                                style={{ padding: "1px 6px", border: `1px solid ${isActive ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: isActive ? "20px 0 0 20px" : "20px", fontSize: "9px", fontWeight: "600", cursor: canEdit ? "pointer" : "default", background: isActive ? "var(--c-accent-dk)" : "transparent", color: isActive ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                                                {m.name}
+                                              </button>
+                                              {isActive && canEdit && (isEditingD ? (
+                                                <div style={{ display: "flex", alignItems: "center", background: "var(--c-accent-dk)", border: "1px solid var(--c-accent)", borderLeft: "none", borderRadius: "0 20px 20px 0", overflow: "hidden" }} onClick={(e) => e.stopPropagation()}>
+                                                  <input autoFocus type="number" min="0" value={editingDays.val}
+                                                    onChange={(e) => setEditingDays((p) => ({ ...p, val: e.target.value }))}
+                                                    onKeyDown={async (e) => { if (e.key === "Enter") { await saveMilestoneDays([item.id], m.id, editingDays.val); setEditingDays(null); } if (e.key === "Escape") setEditingDays(null); }}
+                                                    onBlur={async () => { await saveMilestoneDays([item.id], m.id, editingDays.val); setEditingDays(null); }}
+                                                    style={{ width: "36px", padding: "1px 4px", background: "transparent", border: "none", color: "var(--c-accent-lt)", fontSize: "9px", outline: "none", textAlign: "center" }}
+                                                  />
+                                                  <span style={{ fontSize: "9px", color: "var(--c-accent-lt)", paddingRight: "5px" }}>d</span>
+                                                </div>
+                                              ) : (
+                                                <button onClick={(e) => { e.stopPropagation(); setEditingDays({ itemId: item.id, milestoneId: m.id, val: days != null ? String(days) : "" }); }}
+                                                  style={{ padding: "1px 6px", border: "1px solid var(--c-accent)", borderLeft: "none", borderRadius: "0 20px 20px 0", fontSize: "9px", fontWeight: "600", cursor: "pointer", background: "var(--c-accent-dk)", color: days != null ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap" }}>
+                                                  {days != null ? `${days}d` : "+d"}
+                                                </button>
+                                              ))}
+                                            </div>
                                           );
                                         })}
                                       </div>
                                     )}
-                                    {canEdit && (() => {
-                                      const isOpen = daysPopover?.type === "item" && daysPopover?.itemId === item.id;
-                                      const d = item.days_before_milestone;
-                                      if (isOpen) return (
-                                        <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "var(--c-surface)", border: "1px solid var(--c-accent)", borderRadius: "6px", padding: "2px 6px", flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                                          <input autoFocus type="number" min="0" placeholder="days" value={daysPopover.inputVal}
-                                            onChange={(e) => setDaysPopover((p) => ({ ...p, inputVal: e.target.value }))}
-                                            onKeyDown={(e) => { if (e.key === "Enter") saveDays(daysPopover); if (e.key === "Escape") setDaysPopover(null); }}
-                                            style={{ width: "44px", padding: "2px 4px", background: "var(--c-bg)", border: "none", borderRadius: "4px", color: "var(--c-text)", fontSize: "11px", outline: "none" }}
-                                          />
-                                          <span style={{ fontSize: "10px", color: "var(--c-text-3)" }}>d</span>
-                                          <button onClick={() => saveDays(daysPopover)} style={{ padding: "1px 5px", background: "var(--c-accent)", color: "white", border: "none", borderRadius: "3px", cursor: "pointer", fontSize: "10px", fontWeight: "600" }}>✓</button>
-                                          <button onClick={() => setDaysPopover(null)} style={{ padding: "1px 4px", background: "transparent", border: "none", color: "var(--c-text-3)", cursor: "pointer", fontSize: "11px" }}>×</button>
-                                        </div>
-                                      );
-                                      return (
-                                        <button onClick={(e) => { e.stopPropagation(); setDaysPopover({ type: "item", catId: item.category, itemId: item.id, inputVal: d != null ? String(d) : "" }); }}
-                                          style={{ padding: "1px 6px", border: `1px solid ${d != null ? "var(--c-accent)" : "var(--c-border)"}`, borderRadius: "20px", fontSize: "9px", fontWeight: "600", cursor: "pointer", background: d != null ? "var(--c-accent-dk)" : "transparent", color: d != null ? "var(--c-accent-lt)" : "var(--c-text-4)", whiteSpace: "nowrap", flexShrink: 0 }}>
-                                          📅 {d != null ? `${d}d` : "+"}
-                                        </button>
-                                      );
-                                    })()}
                                     {canEdit && (
                                       <div style={{ display: "flex", gap: "3px", flexShrink: 0 }}>
                                         {editingItemId === item.id
